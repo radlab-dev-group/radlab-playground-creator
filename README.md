@@ -16,7 +16,7 @@ that captures topic evolution and inter‑document relations.
 |---------------------------|----------------------------------------------------------------------------------------------|-------------------------------------------------------|
 | **Embeddings**            | Vector representation of each news piece (torch‑based embedder)                              | In‑memory, optional on‑disk cache                     |
 | **Clusters**              | Groups of semantically similar items (`RdlClusterer`)                                        | Django model `Cluster`                                |
-| **GenAI Labels**          | Human‑readable Polish category names generated via an external LLM                           | Stored in `Cluster.genai_label`                       |
+| **GenAI Labels**          | Human‑readable Polish category names generated via an local LLM                              | Stored in `Cluster.genai_label`                       |
 | **Summary Articles**      | One‑page Polish summary per cluster (spell‑checked)                                          | Stored in `Cluster.article_text`                      |
 | **Day‑to‑Day Similarity** | Cosine similarity links between clusters of adjacent days                                    | Model `SimilarClusters`                               |
 | **Hyper‑graph**           | Weighted graph where nodes are day‑wide clusters and edges encode similarity scores          | Serialized `*.pkl` files in the *hyper_graphs* folder |
