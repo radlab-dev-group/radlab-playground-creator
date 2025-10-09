@@ -1,0 +1,16 @@
+django
+djangorestframework
+django-rest-swagger
+bs4
+beautifulsoup4
+tqdm
+requests
+psycopg2-binary
+sentence_transformers
+
+networkx
+dash
+plotly
+pyarrow
+pandas
+matplotlib
