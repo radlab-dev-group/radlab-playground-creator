@@ -1,0 +1,21 @@
+#!/bin/bash
+
+export PLAYGROUND_PUBLIC_USER_NAME=ULFqX4RxVKX3Xy8aiw7
+export PLAYGROUND_PUBLIC_USER_PASS=xu6qdKGvh49b9f9ddY3
+
+APP_FILE=index_public_news_stream_to_sse.py
+MAIN_DIR=/mnt/data2/dev/develop/radlab-article-creator
+
+MAIN_PROJECT_DIR=${MAIN_DIR}/article_creator
+CONFIG_FILE_PATH=${MAIN_PROJECT_DIR}/configs/public-sse-config.json
+PERIODIC_APPS_DIR=${MAIN_PROJECT_DIR}/apps_creator/periodic
+
+APP_FILE_PATH_PERIODIC_APPS_DIR="${PERIODIC_APPS_DIR}/${APP_FILE}"
+APP_FILE_PATH_MAIN_PROJECT_DIR="${MAIN_PROJECT_DIR}/${APP_FILE}"
+
+cp "${APP_FILE_PATH_PERIODIC_APPS_DIR}" ${APP_FILE_PATH_MAIN_PROJECT_DIR}
+
+cd "${MAIN_PROJECT_DIR}" || return
+
+python3 "${APP_FILE_PATH_MAIN_PROJECT_DIR}" --json-config ${CONFIG_FILE_PATH}
+rm "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
