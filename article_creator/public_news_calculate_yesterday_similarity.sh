@@ -1,0 +1,19 @@
+#!/bin/bash
+
+export CUDA_VISIBLE_DEVICES=1
+
+APP_FILE=calculate_articles_similarity_clusters_p_n.py
+MAIN_DIR=/mnt/local/dev/radlab-article-creator
+
+MAIN_PROJECT_DIR=${MAIN_DIR}/article_creator
+PERIODIC_APPS_DIR=${MAIN_PROJECT_DIR}/apps_creator/periodic
+
+APP_FILE_PATH_PERIODIC_APPS_DIR="${PERIODIC_APPS_DIR}/${APP_FILE}"
+APP_FILE_PATH_MAIN_PROJECT_DIR="${MAIN_PROJECT_DIR}/${APP_FILE}"
+
+cp "${APP_FILE_PATH_PERIODIC_APPS_DIR}" ${APP_FILE_PATH_MAIN_PROJECT_DIR}
+
+cd "${MAIN_PROJECT_DIR}" || return
+
+python3 "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
+rm "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
