@@ -1438,7 +1438,9 @@ class SummaryOfDayNewsController:
         for ssd in SingleDaySummary.objects.filter(day_to_summary=date):
             clusters = []
             clustering = ssd.clustering
-            for cluster in Cluster.objects.filter(clustering=clustering.pk):
+            for cluster in Cluster.objects.filter(
+                clustering=clustering.pk, is_outlier=False
+            ):
                 cl_data = ClusterSerializer(cluster, many=False).data
                 if with_similarity:
                     cl_data["similarity"] = self.__get_similar_clusters(
