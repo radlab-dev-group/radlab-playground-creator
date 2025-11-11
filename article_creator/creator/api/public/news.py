@@ -157,12 +157,21 @@ class PublicNewsFromCategoriesToCheckCorrectness(APIView):
             "min_article_text_length", self.DEFAULT_MIN_ARTICLES_LENGTH
         )
 
+        language_similarity_min = {
+            "en": {"min": min_sim_to_orig, "max": max_sim_to_orig},
+            "fr": {"min": min_sim_to_orig, "max": max_sim_to_orig},
+            "de": {"min": 0.551, "max": max_sim_to_orig},
+            "ru": {"min": min_sim_to_orig, "max": max_sim_to_orig},
+            "ua": {"min": 0.551, "max": max_sim_to_orig},
+        }
+
         news_in_categories = self.n_controller.news_from_all_categories_to_check(
             news_in_category=news_in_category,
             filter_pages=filter_pages,
             min_sim_to_orig=min_sim_to_orig,
             max_sim_to_orig=max_sim_to_orig,
             min_article_text_length=min_article_text_length,
+            language_similarity_min=language_similarity_min,
         )
 
         return response_with_status(

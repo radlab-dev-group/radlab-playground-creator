@@ -6,6 +6,8 @@ import logging
 import datetime
 import requests
 import urllib.request
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 
 from bs4 import BeautifulSoup
 from typing import List, Dict, Tuple, Any, Optional
@@ -158,7 +160,7 @@ class NewsController:
         self,
         add_to_db: bool = True,
         seconds_prev_check: int = 0,
-        models_config_path: str or None = DEFAULT_MODELS_CONFIG,
+        models_config_path: str | None = DEFAULT_MODELS_CONFIG,
     ):
         """
         Initialize controller
@@ -331,7 +333,7 @@ class NewsController:
                 gen_article_str=gen_article_str,
                 orig_article_str=orig_article_str,
                 cross_encoder_sim_model=cross_encoder_sim_model,
-                ce_model_max_seq_len=514,
+                ce_model_max_seq_len=450,
             )
 
         show_news = news_sub_page.main_page.show_news
@@ -715,14 +717,15 @@ class NewsContentGrabberController:
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/114.0.0.0 Safari/537.36"
+            "Chrome/124.0.0.0 Safari/537.36"
         ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Connection": "keep-alive",
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml;"
+            "q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+        ),
+        "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
         "Referer": "https://www.google.com/",
-        "DNT": "1",
-        "Upgrade-Insecure-Requests": "1",
+        "Connection": "keep-alive",
     }
 
     def __init__(self):
@@ -1095,6 +1098,82 @@ class NewsContentGrabberController:
         return content
 
     @staticmethod
+    def fetch_html_with_session(
+        url: str, session: requests.Session | None = None
+    ) -> str:
+        """
+        Pobiera i zwraca treść HTML podanego URL.
+        Automatycznie obsługuje ciasteczka, retry i poprawne kodowanie.
+        """
+
+        def create_session() -> requests.Session:
+            """
+            Tworzy sesję `requests` z:
+              • realistycznym User‑Agentem,
+              • dodatkowymi nagłówkami,
+              • mechanizmem retry (3 próby przy błędach sieciowych),
+              • włączonym przechowywaniem ciasteczek.
+            """
+            session = requests.Session()
+
+            # ---------- Nagłówki ----------
+            session.headers.update(
+                {
+                    # Najważniejszy – podaje przeglądarkę, której „udajemy” się być
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    ),
+                    # Dodatkowe, które często pojawiają się w zwykłych przeglądarkach
+                    "Accept": (
+                        "text/html,application/xhtml+xml,application/xml;"
+                        "q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+                    ),
+                    "Accept-Language": "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Referer": "https://www.google.com/",  # dowolny, ale „prawdziwy”
+                    "Connection": "keep-alive",
+                }
+            )
+
+            # ---------- Retry ----------
+            # Przy problemach sieciowych (np. 502, 503) spróbuj ponownie 3 razy
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=1,  # 1 s, 2 s, 4 s …
+                status_forcelist=[429, 500, 502, 503, 504],
+                allowed_methods=["GET"],
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            session.mount("https://", adapter)
+            session.mount("http://", adapter)
+            return session
+
+        if session is None:
+            session = create_session()
+
+        try:
+            # `allow_redirects=True` – domyślne, ale jawnie podkreślamy intencję
+            response = session.get(url, timeout=12, allow_redirects=True)
+            # Podnieś wyjątek przy kodach 4xx/5xx (np. 401, 403)
+            response.raise_for_status()
+            # requests sam wykrywa kodowanie, ale możemy wymusić:
+            response.encoding = "utf-8"
+            return response.text
+
+        except requests.HTTPError as http_err:
+            # 401, 403, 404 … – przydatne logowanie
+            raise RuntimeError(
+                f"HTTP error przy pobieraniu {url!r}: {http_err.response.status_code} "
+                f"{http_err.response.reason}"
+            ) from http_err
+        except requests.RequestException as req_err:
+            # Problemy sieciowe, timeout itp.
+            raise RuntimeError(
+                f"Błąd połączenia przy pobieraniu {url!r}: {req_err}"
+            ) from req_err
+
+    @staticmethod
     def download_page_content_html(url: str) -> str | None:
         logging.info(f"Downloading news content: {url}")
 
@@ -1108,13 +1187,22 @@ class NewsContentGrabberController:
                 return resp_read
         except Exception as e:
             try:
-                logging.warning("Catched exception while downloading news content")
-                logging.warning(e)
-                logging.warning("Trying to download content with request.get")
-                resp_read = requests.get(url, timeout=10)
-                logging.info(resp_read.text)
+                logging.warning("Caught exception while downloading news content")
+                logging.error(e)
+                logging.warning(
+                    "Trying to download content with fetch_html_with_session"
+                )
+                return NewsContentGrabberController.fetch_html_with_session(
+                    url=url, session=None
+                )
             except Exception as e:
-                logging.error(f"Error during downloading {url}: {e}")
+                logging.warning("Caught exception while downloading news content")
+                logging.warning("Trying to download content with request.get")
+                try:
+                    resp_read = requests.get(url, timeout=10)
+                    return resp_read.text
+                except Exception as e:
+                    logging.error(f"Error during downloading {url}: {e}")
 
             return None
 
@@ -1314,6 +1402,7 @@ class NewsControllerSimple:
         min_sim_to_orig: float,
         max_sim_to_orig: float,
         min_article_text_length: int,
+        language_similarity_min: Optional[Dict[str, Dict[str, float]]] = None,
     ):
         if filter_pages is None:
             filter_pages = {}
@@ -1325,6 +1414,7 @@ class NewsControllerSimple:
             filter_options=filter_options,
             filter_pages=filter_pages,
             similarity_opts={"min": min_sim_to_orig, "max": max_sim_to_orig},
+            language_similarity_min=language_similarity_min,
         )
 
         merged = {}
@@ -1356,6 +1446,7 @@ class NewsControllerSimple:
         filter_options: dict,
         filter_pages: Dict[str, List] | None,
         similarity_opts: Dict[str, float] | None = None,
+        language_similarity_min: Optional[Dict[str, Dict[str, float]]] = None,
     ):
         generated_news = {}
         for category in NewsControllerSimple.get_public_news_categories():
@@ -1389,9 +1480,26 @@ class NewsControllerSimple:
                     | Q(similarity_to_original__lte=min_sim)
                 )
 
-            all_gen_news = all_gen_news[:news_in_category]
+            _all_gen_news = []
+            if language_similarity_min:
+                for n in all_gen_news:
+                    main_page_language = n.news_sub_page.main_page.language
+                    if main_page_language not in language_similarity_min:
+                        _all_gen_news.append(n)
+                    else:
+                        min_sim = language_similarity_min[main_page_language]["min"]
+                        max_sim = language_similarity_min[main_page_language]["max"]
+                        if n.similarity_to_original <= min_sim:
+                            _all_gen_news.append(n)
+                        elif n.similarity_to_original >= max_sim:
+                            _all_gen_news.append(n)
+            else:
+                _all_gen_news = all_gen_news
 
-            generated_news[category.name] = all_gen_news
+            if news_in_category:
+                _all_gen_news = _all_gen_news[:news_in_category]
+
+            generated_news[category.name] = _all_gen_news
         return generated_news
 
     @staticmethod
