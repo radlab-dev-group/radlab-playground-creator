@@ -9,15 +9,26 @@ from sentence_transformers.cross_encoder import CrossEncoder
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "main.settings")
 django.setup()
 
-from general.constants import DEFAULT_MODELS_CONFIG
-
-from creator.controllers.news import NewsController
 from system.controllers import SystemController
-
-CROSS_ENCODER_MODEL = "radlab/polish-cross-encoder"
+from creator.controllers.news import NewsController
+from general.constants import DEFAULT_MODELS_CONFIG
+from apps_creator.periodic.src.utils import prepare_parser
 
 
 def main(argv=None):
+    parser = prepare_parser(argv)
+    parser.add_argument(
+        "--without-ce-sim", dest="without_ce_sim", action="store_true"
+    )
+    parser.add_argument(
+        "--cross-encoder-model",
+        dest="cross_encoder_model",
+        default="radlab/polish-cross-encoder",
+        help="Cross-Encoder model in case when similarity should be calculated "
+        "between generated news and the original article.",
+    )
+    args = parser.parse_args()
+
     system_settings = SystemController.get_system_settings()
     if system_settings.doing_news_summarization:
         return
@@ -31,16 +42,19 @@ def main(argv=None):
             seconds_prev_check=0,
             models_config_path=DEFAULT_MODELS_CONFIG,
         )
+
         articles_to_summarize = (
             news_controller.public_subpages_without_summarization()
         )
         articles_to_summarize = list(articles_to_summarize)
         random.shuffle(articles_to_summarize)
-        if len(articles_to_summarize):
-            logging.info(f"Loading CE model {CROSS_ENCODER_MODEL}...")
-            ce_sim_model = CrossEncoder(CROSS_ENCODER_MODEL)
+
+        if len(articles_to_summarize) and not args.without_ce_sim:
+            logging.info(f"Loading CE model {args.cross_encoder_model}...")
+            ce_sim_model = CrossEncoder(args.cross_encoder_model)
             logging.info(
-                f"Model {CROSS_ENCODER_MODEL} is loaded, starting news generation"
+                f"Model {args.cross_encoder_model} is loaded, "
+                f"starting news generation"
             )
 
         all_generated_news = []
@@ -55,7 +69,12 @@ def main(argv=None):
                 news_sub_page=news_sub_page, cross_encoder_sim_model=ce_sim_model
             )
             if generated_news is None:
+                logging.warning(
+                    f"Problem occurred while generating news for "
+                    f"{news_sub_page.news_url} "
+                )
                 continue
+
             all_generated_news.append(generated_news)
 
         logging.info(f"Generated {len(all_generated_news)} news")
