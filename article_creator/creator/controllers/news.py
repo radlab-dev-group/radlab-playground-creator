@@ -156,7 +156,6 @@ class NewsController:
     MAIN_NEWS_STREAM_LLM_ROUTER_TOKEN = "llm_router_token"
     MAIN_NEWS_STREAM_LLM_ROUTER_MODEL = "llm_router_model"
 
-
     ####
     MAIN_NEWS_CREATOR_GENERATE_ARTICLE = "generate_article_from_search_result"
     API_HEADER = {"Content-Type": "application/json; charset=utf-8"}
@@ -315,12 +314,16 @@ class NewsController:
         return LLMRouterClient(
             api=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_HOST],
             token=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_TOKEN],
-            default_model=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_MODEL]
+            default_model=self._models_config[
+                self.MAIN_NEWS_STREAM_LLM_ROUTER_MODEL
+            ],
         )
 
     def __translate_to_pl(self, text: str) -> str:
         with self.__llm_router_client() as llm_router:
-            j_result = llm_router.translate(texts=[text])
+            j_result = llm_router.translate(
+                payload={"max_new_tokens": len(text), "texts": [text]}
+            )
 
         if not j_result or not "response" in j_result:
             return text
@@ -345,14 +348,14 @@ class NewsController:
         orig_article_str_translated = None
 
         if news_sub_page.main_page.language != "pl":
-            orig_article_str_translated = self.__translate_to_pl(text=orig_article_str)
+            orig_article_str_translated = self.__translate_to_pl(
+                text=orig_article_str
+            )
             news_sub_page.page_content_txt_translated = orig_article_str_translated
             if self._add_to_db:
                 NewsSubPage.objects.filter(pk=news_sub_page.pk).update(
                     page_content_txt_translated=orig_article_str_translated
                 )
-        else:
-            return None
 
         gen_article_str, gen_time, model_name = self._generate_news_from_article(
             article_str=orig_article_str_translated or orig_article_str
@@ -743,7 +746,6 @@ class NewsController:
             result_sim = float(sum(gen_max_sims) / len(gen_max_sims))
         return result_sim
 
-
     def _generate_news_from_article(
         self, article_str: str
     ) -> (str | None, float | None, str | None):
@@ -862,7 +864,6 @@ class NewsController:
             html_content=content_html,
             extracted_urls=extracted_urls,
         )
-
 
     @staticmethod
     def __prepare_hash_main_page_content(extracted_urls: List[str]) -> str | None:
