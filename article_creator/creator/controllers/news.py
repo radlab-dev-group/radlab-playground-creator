@@ -4,6 +4,7 @@ import random
 import hashlib
 import logging
 import datetime
+
 import requests
 import urllib.request
 
@@ -13,6 +14,8 @@ from typing import List, Dict, Tuple, Any, Optional
 
 from radlab_data.text.utils import TextUtils
 from radlab_data.text.processors.splitter import SentenceSplitter
+
+from llm_router_lib.client import LLMRouterClient
 
 from creator.models import SystemUser, Clustering
 from general.api_utils import BasePublicApiInterface
@@ -147,8 +150,14 @@ class MainNewsController:
 class NewsController:
     MAX_PUBLIC_NEWS_CHAR_LENGTH = 10000
     MIN_ARTICLE_LEN_TO_GENERATE_NEWS = 150
+
     MAIN_NEWS_STREAM_PUBLIC_JSON_FIELD = "stream_news_free"
-    MAIN_NEWS_STREAM_GENERATE_ARTICLE = "generate_article_from_text"
+    MAIN_NEWS_STREAM_LLM_ROUTER_HOST = "llm_router_host"
+    MAIN_NEWS_STREAM_LLM_ROUTER_TOKEN = "llm_router_token"
+    MAIN_NEWS_STREAM_LLM_ROUTER_MODEL = "llm_router_model"
+
+
+    ####
     MAIN_NEWS_CREATOR_GENERATE_ARTICLE = "generate_article_from_search_result"
     API_HEADER = {"Content-Type": "application/json; charset=utf-8"}
 
@@ -293,12 +302,34 @@ class NewsController:
             when_generated__gte=begin_date,
         )
 
+    def __llm_router_client(self) -> LLMRouterClient:
+        """
+        Creates and returns an instance of LLMRouterClient configured for the main
+        news stream routing service.
+
+        Returns:
+            LLMRouterClient: An instance of the LLMRouterClient, initialized with
+            API endpoint, authentication token, and default model extracted from the
+            configuration.
+        """
+        return LLMRouterClient(
+            api=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_HOST],
+            token=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_TOKEN],
+            default_model=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_MODEL]
+        )
+
+    def __translate_to_pl(self, text: str) -> str:
+        with self.__llm_router_client() as llm_router:
+            j_result = llm_router.translate(texts=[text])
+
+        if not j_result or not "response" in j_result:
+            return text
+        return j_result["response"][0]["translated"]
+
     def generate_news(
         self, news_sub_page: NewsSubPage, cross_encoder_sim_model=None
     ) -> GeneratedNews | None:
         assert self._models_config is not None
-        if news_sub_page is None:
-            return None
 
         if (
             len(news_sub_page.page_content_txt.strip())
@@ -311,9 +342,27 @@ class NewsController:
             return None
 
         orig_article_str = news_sub_page.page_content_txt.strip()
-        gen_article_str, gen_time, model_name = self._generate_article_from_article(
-            article_str=orig_article_str
+        orig_article_str_translated = None
+
+        if news_sub_page.main_page.language != "pl":
+            orig_article_str_translated = self.__translate_to_pl(text=orig_article_str)
+            news_sub_page.page_content_txt_translated = orig_article_str_translated
+            if self._add_to_db:
+                NewsSubPage.objects.filter(pk=news_sub_page.pk).update(
+                    page_content_txt_translated=orig_article_str_translated
+                )
+        else:
+            return None
+
+        gen_article_str, gen_time, model_name = self._generate_news_from_article(
+            article_str=orig_article_str_translated or orig_article_str
         )
+
+        logging.info("==" * 50)
+        logging.info(orig_article_str_translated or "w/o translation")
+        logging.info("--" * 50)
+        logging.info(gen_article_str)
+        logging.info("==" * 50)
 
         news_sub_page.num_of_generated_news += 1
         if gen_article_str is None or not len(gen_article_str):
@@ -694,47 +743,22 @@ class NewsController:
             result_sim = float(sum(gen_max_sims) / len(gen_max_sims))
         return result_sim
 
-    def _generate_article_from_article(
+
+    def _generate_news_from_article(
         self, article_str: str
     ) -> (str | None, float | None, str | None):
+
         if len(article_str) > self.MAX_PUBLIC_NEWS_CHAR_LENGTH:
             article_str = article_str[: self.MAX_PUBLIC_NEWS_CHAR_LENGTH]
 
-        model_name = self._models_config[self.MAIN_NEWS_STREAM_GENERATE_ARTICLE][
-            "model_name"
-        ]
-        model_host = self._models_config[self.MAIN_NEWS_STREAM_GENERATE_ARTICLE][
-            "model_hosts"
-        ][0]
-        prepare_article_ep = self._models_config[
-            self.MAIN_NEWS_STREAM_GENERATE_ARTICLE
-        ]["ep"]["prepare_article"]
-        ep_url = f"{model_host.strip('/')}/{prepare_article_ep.strip('/')}"
-
-        ep_data = {
-            "text": article_str,
-            "model_name": model_name,
-            "top_k": 0,
-            "top_p": 0.90,
-            "max_new_tokens": 256,
-            "temperature": 0.6,
-            "typical_p": 1.0,
-            "repetition_penalty": 1.00,
-        }
-
-        ep_response = BasePublicApiInterface.general_call_post(
-            host_url=None,
-            endpoint=ep_url,
-            data=None,
-            json_data=ep_data,
-            headers=self.API_HEADER,
-            login_url=None,
-        )
-        if "response" not in ep_response:
-            return None, None, None
+        with self.__llm_router_client() as llm_router:
+            model_name = llm_router.default_model
+            ep_response = llm_router.generate_news_from_text(text=article_str)
+            if "response" not in ep_response:
+                return None, None, None
 
         article_text = ep_response["response"].get("article_text", None)
-        gen_time = ep_response.get("generation_time", None)
+        gen_time = ep_response.get("generation_time", 0)
 
         if gen_time is not None:
             gen_time = datetime.timedelta(seconds=gen_time)
@@ -838,6 +862,7 @@ class NewsController:
             html_content=content_html,
             extracted_urls=extracted_urls,
         )
+
 
     @staticmethod
     def __prepare_hash_main_page_content(extracted_urls: List[str]) -> str | None:
