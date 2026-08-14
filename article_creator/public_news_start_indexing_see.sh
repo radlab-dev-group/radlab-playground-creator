@@ -4,9 +4,8 @@ export PLAYGROUND_PUBLIC_USER_NAME=ULFqX4RxVKX3Xy8aiw7
 export PLAYGROUND_PUBLIC_USER_PASS=xu6qdKGvh49b9f9ddY3
 
 APP_FILE=index_public_news_stream_to_sse.py
-MAIN_DIR=/mnt/data2/dev/develop/radlab-article-creator
 
-MAIN_PROJECT_DIR=${MAIN_DIR}/article_creator
+MAIN_PROJECT_DIR=`pwd`
 CONFIG_FILE_PATH=${MAIN_PROJECT_DIR}/configs/public-sse-config.json
 PERIODIC_APPS_DIR=${MAIN_PROJECT_DIR}/apps_creator/periodic
 

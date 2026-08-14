@@ -3,7 +3,6 @@
 export CUDA_VISIBLE_DEVICES=1
 
 APP_FILE=sub_graphs_generalizer.py
-MAIN_DIR=/mnt/data2/dev/develop/radlab-article-creator
 
 MAIN_OUT_DIR="resources/info_graphs/generalized"
 
@@ -14,7 +13,7 @@ OUT_DIR="resources/info_graphs/generalized/20250629_185005/"
 
 # =============================================================================
 
-MAIN_PROJECT_DIR=${MAIN_DIR}/article_creator
+MAIN_PROJECT_DIR=`pwd`
 PERIODIC_APPS_DIR=${MAIN_PROJECT_DIR}/apps_creator/admin
 
 APP_FILE_PATH_PERIODIC_APPS_DIR="${PERIODIC_APPS_DIR}/${APP_FILE}"

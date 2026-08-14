@@ -4,9 +4,8 @@ export PLAYGROUND_PUBLIC_USER_NAME=xyz
 export PLAYGROUND_PUBLIC_USER_PASS=xyz
 
 APP_FILE=check_news_polarity_for_public_stream.py
-MAIN_DIR=/mnt/data2/dev/develop/radlab-article-creator
 
-MAIN_PROJECT_DIR=${MAIN_DIR}/article_creator
+MAIN_PROJECT_DIR=`pwd`
 PERIODIC_APPS_DIR=${MAIN_PROJECT_DIR}/apps_creator/periodic
 
 APP_FILE_PATH_PERIODIC_APPS_DIR="${PERIODIC_APPS_DIR}/${APP_FILE}"
