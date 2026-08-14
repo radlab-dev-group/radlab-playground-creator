@@ -645,7 +645,7 @@ class NewsController:
         max_gen_tokens = max(gen_token_lengths)
 
         # 3. Compute global chunk budget for orig_text
-        chunk_size = ce_max_tokens - max_gen_tokens - special_token
+        chunk_size = ce_max_tokens - max_gen_tokens - special_tokens
         if chunk_size <= 0:
             logging.warning(
                 f"Patch matching fallback: longest gen sentence ({max_gen_tokens} tokens) "
