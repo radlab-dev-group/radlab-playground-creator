@@ -1122,6 +1122,7 @@ class NewsContentGrabberController:
             "Фото :",
             "Dodaj nas do preferowanych źródeł w Google",
             "Obserwuj nas w Google News",
+            "Przeczytaj całość artykułu!",
         ]
         par_text_lower = paragraph_text.lower()
         for p2c in phrases_to_clear:
