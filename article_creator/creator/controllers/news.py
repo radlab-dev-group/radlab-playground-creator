@@ -965,6 +965,8 @@ class NewsContentGrabberController:
             "Фото -",
             "Фото:",
             "Фото :",
+            "Dodaj nas do preferowanych źródeł w Google",
+            "Obserwuj nas w Google News",
         ]
         par_text_lower = paragraph_text.lower()
         for p2c in phrases_to_clear:
@@ -1062,6 +1064,8 @@ class NewsContentGrabberController:
             "źr. ",
             "Źródło:",
             "Mat. oryginalny:",
+            "To jest materiałPremium",
+            "polsatnews.pl",
         ]
         for p in phrases:
             content = content.split(p)[0]
