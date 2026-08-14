@@ -13,12 +13,12 @@ OUT_DIR="resources/info_graphs/generalized/20250629_185005/"
 
 # =============================================================================
 
-MAIN_PROJECT_DIR=`pwd`
+MAIN_PROJECT_DIR=$(pwd)
 PERIODIC_APPS_DIR=${MAIN_PROJECT_DIR}/apps_creator/admin
 
 APP_FILE_PATH_PERIODIC_APPS_DIR="${PERIODIC_APPS_DIR}/${APP_FILE}"
 APP_FILE_PATH_MAIN_PROJECT_DIR="${MAIN_PROJECT_DIR}/${APP_FILE}"
-cp "${APP_FILE_PATH_PERIODIC_APPS_DIR}" ${APP_FILE_PATH_MAIN_PROJECT_DIR}
+cp "${APP_FILE_PATH_PERIODIC_APPS_DIR}" "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
 
 # =============================================================================
 
