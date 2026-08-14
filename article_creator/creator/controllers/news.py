@@ -362,6 +362,8 @@ class NewsController:
         )
 
         logging.info("==" * 50)
+        logging.info(orig_article_str)
+        logging.info("--" * 50)
         logging.info(orig_article_str_translated or "w/o translation")
         logging.info("--" * 50)
         logging.info(gen_article_str)
