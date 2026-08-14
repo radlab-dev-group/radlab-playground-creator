@@ -8,13 +8,13 @@ import requests
 import urllib.request
 
 from bs4 import BeautifulSoup
-from typing import List, Dict, Tuple, Any, Optional
 from django.db.models import Q, QuerySet
+from typing import List, Dict, Tuple, Any, Optional
 
 from radlab_data.text.utils import TextUtils
+from radlab_data.text.processors.splitter import SentenceSplitter
 
-from creator.models import SystemUser, GeneratedNews, Clustering, NewsMainPage
-
+from creator.models import SystemUser, Clustering
 from general.api_utils import BasePublicApiInterface
 from general.constants import DEFAULT_MODELS_CONFIG
 
@@ -152,13 +152,11 @@ class NewsController:
     MAIN_NEWS_CREATOR_GENERATE_ARTICLE = "generate_article_from_search_result"
     API_HEADER = {"Content-Type": "application/json; charset=utf-8"}
 
-    MODEL_TO_NEWS_SIMILARITY_CALCULATION_CE = "radlab/polish-cross-encoder"
-
     def __init__(
         self,
         add_to_db: bool = True,
         seconds_prev_check: int = 0,
-        models_config_path: str or None = DEFAULT_MODELS_CONFIG,
+        models_config_path: Optional[str] = DEFAULT_MODELS_CONFIG,
     ):
         """
         Initialize controller
@@ -172,6 +170,8 @@ class NewsController:
 
         self._models_config = None
         self._models_config_path = models_config_path
+
+        self._splitter = SentenceSplitter()
 
         if models_config_path is not None and len(models_config_path.strip()):
             self._load_models_config(models_config_path)
@@ -330,8 +330,8 @@ class NewsController:
             gen_news_sim = self._calculate_similarity_ce(
                 gen_article_str=gen_article_str,
                 orig_article_str=orig_article_str,
-                cross_encoder_sim_model=cross_encoder_sim_model,
-                ce_model_max_seq_len=514,
+                cross_encoder_model=cross_encoder_sim_model,
+                ce_model_max_tokens=512,
             )
 
         show_news = news_sub_page.main_page.show_news
@@ -485,7 +485,8 @@ class NewsController:
             return
 
         show_news = True
-        if news.similarity_to_original < ProperNewsParameters.min_sim_to_original:
+        sim = news.similarity_to_original
+        if sim is not None and sim < ProperNewsParameters.min_sim_to_original:
             show_news = False
         elif len(news.generated_text) < ProperNewsParameters.min_length:
             show_news = False
@@ -526,18 +527,172 @@ class NewsController:
         return TextUtils.text_language(text)
 
     @staticmethod
+    def _split_to_fixed_chunks(
+        text: str,
+        tokenizer,
+        chunk_size_tokens: int,
+        overlap_window_perc: float = 0.2,
+    ) -> list[str]:
+        """
+        Split *text* into overlapping token-level chunks (sliding window).
+
+        Each chunk covers ``chunk_size_tokens`` tokens; the window advances by
+        80 % of that size, leaving a 20 % overlap between consecutive chunks.
+        No sentence-level splitting is used — raw token streams are sliced.
+
+        Returns the list of decoded chunk strings (stripped). Empty when the
+        text fits into fewer tokens than ``chunk_size_tokens``.
+        """
+        if chunk_size_tokens <= 0:
+            return []
+
+        all_tokens = tokenizer.encode(text)
+        n = len(all_tokens)
+        if n <= chunk_size_tokens:
+            # Entire text fits in one chunk — no need to slide
+            return []
+
+        step = chunk_size_tokens - int(chunk_size_tokens * overlap_window_perc)
+
+        chunks: list[str] = []
+        covered_end = 0
+
+        for start in range(0, n - chunk_size_tokens + 1, step):
+            end = start + chunk_size_tokens
+            chunk_str = tokenizer.decode(all_tokens[start:end])
+            if chunk_str.strip():
+                chunks.append(chunk_str.strip())
+            covered_end = end
+
+        # Final chunk: capture any tokens beyond the last window
+        if covered_end < n:
+            tail = tokenizer.decode(all_tokens[-chunk_size_tokens:])
+            if tail.strip() and (not chunks or chunks[-1] != tail):
+                chunks.append(tail.strip())
+
+        return chunks
+
     def _calculate_similarity_ce(
+        self,
         gen_article_str,
         orig_article_str,
-        cross_encoder_sim_model,
-        ce_model_max_seq_len: int,
-    ) -> float:
+        cross_encoder_model,
+        ce_model_max_tokens: int,
+        special_tokens: int = 2,  # [CLS] + [SEP] for sentence pair
+    ) -> float | None:
+        tokenizer = cross_encoder_model.tokenizer
+        tokens_s1 = len(tokenizer.encode(gen_article_str))
+        tokens_s2 = len(tokenizer.encode(orig_article_str))
 
-        s1 = gen_article_str[: ce_model_max_seq_len - 1]
-        s2 = orig_article_str[: ce_model_max_seq_len - 1]
-        sim_val = cross_encoder_sim_model.predict([(s1, s2)])
-        sim_val = sim_val[0] if len(sim_val) else 0.0
+        if tokens_s1 + tokens_s2 + special_tokens > ce_model_max_tokens:
+            sim_val = self._calculate_similarity_ce_patch_match(
+                gen_article_str,
+                orig_article_str,
+                cross_encoder_model,
+                ce_model_max_tokens,
+                special_tokens,
+            )
+        else:
+            sim_val = cross_encoder_model.predict(
+                [(gen_article_str, orig_article_str)]
+            )
+            sim_val = sim_val[0] if len(sim_val) else 0.0
+
         return sim_val
+
+    def _calculate_similarity_ce_patch_match(
+        self,
+        gen_text: str,
+        orig_text: str,
+        cross_encoder_model,
+        ce_max_tokens: int,
+        special_tokens: int,
+    ) -> float | None:
+        """
+        Calculates the similarity between generated text and original text using a cross-encoder model with patch matching.
+
+        This method employs a process to compare sentences from the generated text with chunks of the
+        original text, determining the similarity based on a cross-encoder model's prediction.
+        The process includes sentence splitting, tokenization, fixed-size chunking,
+        batch prediction, and result aggregation.
+
+        Parameters:
+        gen_text: str
+            The generated text to compare.
+        orig_text: str
+            The original text to compare against.
+        cross_encoder_model
+            The cross-encoder model used for similarity prediction.
+        ce_max_tokens: int
+            The maximum number of tokens allowed by the cross-encoder model per input pair.
+        special_tokens: int
+            The number of special tokens reserved for the model's tokenizer.
+
+        Returns:
+        float or None
+            A similarity score between the generated and original text, averaged over all
+            sentences in the generated text. Returns None if no valid pairings or computations
+            can be made (e.g., constraints exceed token limits).
+        """
+        # 1. Split gen_text into sentences
+        gen_sentences = [s for s in self._splitter.split(gen_text) if s]
+        if not gen_sentences:
+            return None
+
+        # 2. Find longest gen sentence (token count)
+        tokenizer = cross_encoder_model.tokenizer
+        gen_token_lengths = [len(tokenizer.encode(s)) for s in gen_sentences]
+        max_gen_tokens = max(gen_token_lengths)
+
+        # 3. Compute global chunk budget for orig_text
+        chunk_size = ce_max_tokens - max_gen_tokens - special_token
+        if chunk_size <= 0:
+            logging.warning(
+                f"Patch matching fallback: longest gen sentence ({max_gen_tokens} tokens) "
+                f"exceeds CE token limit {ce_max_tokens} (budget = {chunk_size})."
+            )
+            return None
+
+        # 4. Split orig_text into fixed-size chunks
+        orig_chunks = self._split_to_fixed_chunks(orig_text, tokenizer, chunk_size)
+        if not orig_chunks:
+            logging.warning(
+                f"Patch matching fallback: orig_text could not form any chunk "
+                f"(budget {chunk_size} tokens too small)."
+            )
+            return None
+
+        # 5. Build valid (gen_idx, chunk_idx) pairs — cache gen token lengths
+        valid_pairs: list[tuple[int, int]] = []
+        for gi, gs in enumerate(gen_sentences):
+            for ci, chunk_text in enumerate(orig_chunks):
+                valid_pairs.append((gi, ci))
+                # if gen_token_lengths[gi] + len(tokenizer.encode(chunk_text)) + special_tokens <= ce_max_tokens:
+                #     valid_pairs.append((gi, ci))
+
+        if not valid_pairs:
+            logging.warning(
+                f"Patch matching fallback: no (gen_sentence, orig_chunk) pair fits "
+                f"within the token limit {ce_max_tokens}."
+            )
+            return None
+
+        # 6. Batch predict
+        batch = [(gen_sentences[gi], orig_chunks[ci]) for gi, ci in valid_pairs]
+        scores = cross_encoder_model.predict(batch)
+
+        # 7. Per-gen-sentence: max similarity across all chunks (Max Pooling)
+        gen_max_sims: list[float] = [0.0] * len(gen_sentences)
+        for (gi, _), score in zip(valid_pairs, scores):
+            if gi < len(gen_max_sims):
+                gen_max_sims[gi] = max(gen_max_sims[gi], float(score))
+
+        # 8. Aggregate result
+        result_sim = None
+        matched_count = sum(1 for s in gen_max_sims if s > 0.0)
+        if matched_count > 0:
+            result_sim = float(sum(gen_max_sims) / len(gen_max_sims))
+        return result_sim
 
     def _generate_article_from_article(
         self, article_str: str
