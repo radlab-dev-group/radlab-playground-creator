@@ -6,23 +6,26 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('system', '0007_systemsettings_doing_news_generation_for_yesterday_similarity_and_more'),
+        (
+            "system",
+            "0007_systemsettings_doing_news_generation_for_yesterday_similarity_and_more",
+        ),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='systemsettings',
-            name='doing_information_graph',
+            model_name="systemsettings",
+            name="doing_information_graph",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_information_graph_begin',
+            model_name="systemsettings",
+            name="last_news_information_graph_begin",
             field=models.DateTimeField(null=True),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_information_graph_end',
+            model_name="systemsettings",
+            name="last_news_information_graph_end",
             field=models.DateTimeField(null=True),
         ),
     ]

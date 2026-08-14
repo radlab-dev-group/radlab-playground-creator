@@ -6,23 +6,26 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('system', '0004_rename_polarity_3c_statistics_articlesstatistics_polarity_statistics_and_more'),
+        (
+            "system",
+            "0004_rename_polarity_3c_statistics_articlesstatistics_polarity_statistics_and_more",
+        ),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='systemsettings',
-            name='doing_news_publ_stats',
+            model_name="systemsettings",
+            name="doing_news_publ_stats",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_publ_stats_check_begin',
+            model_name="systemsettings",
+            name="last_news_publ_stats_check_begin",
             field=models.DateTimeField(null=True),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_publ_stats_check_end',
+            model_name="systemsettings",
+            name="last_news_publ_stats_check_end",
             field=models.DateTimeField(null=True),
         ),
     ]

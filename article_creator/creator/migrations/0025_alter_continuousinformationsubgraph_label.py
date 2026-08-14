@@ -6,13 +6,16 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0024_continuousinformationsubgraph_sub_graph_directory_and_more'),
+        (
+            "creator",
+            "0024_continuousinformationsubgraph_sub_graph_directory_and_more",
+        ),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='continuousinformationsubgraph',
-            name='label',
+            model_name="continuousinformationsubgraph",
+            name="label",
             field=models.TextField(),
         ),
     ]

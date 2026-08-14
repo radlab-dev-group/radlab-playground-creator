@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0022_continuousinformationgraph_and_more'),
+        ("creator", "0022_continuousinformationgraph_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='continuousinformationgraph',
-            name='summary',
+            model_name="continuousinformationgraph",
+            name="summary",
             field=models.JSONField(default=dict, null=True),
         ),
         migrations.AlterField(
-            model_name='continuousinformationgraph',
-            name='info',
+            model_name="continuousinformationgraph",
+            name="info",
             field=models.JSONField(default=dict, null=True),
         ),
     ]

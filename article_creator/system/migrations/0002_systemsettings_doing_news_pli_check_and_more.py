@@ -6,38 +6,38 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('system', '0001_initial'),
+        ("system", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='systemsettings',
-            name='doing_news_pli_check',
+            model_name="systemsettings",
+            name="doing_news_pli_check",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='doing_news_polarity_3c_check',
+            model_name="systemsettings",
+            name="doing_news_polarity_3c_check",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_pli_check_begin',
+            model_name="systemsettings",
+            name="last_news_pli_check_begin",
             field=models.DateTimeField(null=True),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_pli_check_end',
+            model_name="systemsettings",
+            name="last_news_pli_check_end",
             field=models.DateTimeField(null=True),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_polarity_3c_check_begin',
+            model_name="systemsettings",
+            name="last_news_polarity_3c_check_begin",
             field=models.DateTimeField(null=True),
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_news_polarity_3c_check_end',
+            model_name="systemsettings",
+            name="last_news_polarity_3c_check_end",
             field=models.DateTimeField(null=True),
         ),
     ]

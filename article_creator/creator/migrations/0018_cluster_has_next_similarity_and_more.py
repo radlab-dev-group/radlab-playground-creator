@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0017_cluster_is_active_clustering_is_active_and_more'),
+        ("creator", "0017_cluster_is_active_clustering_is_active_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='cluster',
-            name='has_next_similarity',
+            model_name="cluster",
+            name="has_next_similarity",
             field=models.BooleanField(default=False),
         ),
         migrations.AddField(
-            model_name='cluster',
-            name='has_prev_similarity',
+            model_name="cluster",
+            name="has_prev_similarity",
             field=models.BooleanField(default=False),
         ),
     ]

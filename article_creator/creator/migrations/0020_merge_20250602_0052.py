@@ -6,9 +6,8 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0018_singledaysummary'),
-        ('creator', '0019_similarclusters_clustering_and_more'),
+        ("creator", "0018_singledaysummary"),
+        ("creator", "0019_similarclusters_clustering_and_more"),
     ]
 
-    operations = [
-    ]
+    operations = []

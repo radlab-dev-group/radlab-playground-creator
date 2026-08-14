@@ -7,45 +7,67 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0016_cluster_sample_indices_and_more'),
+        ("creator", "0016_cluster_sample_indices_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='cluster',
-            name='is_active',
+            model_name="cluster",
+            name="is_active",
             field=models.BooleanField(default=True),
         ),
         migrations.AddField(
-            model_name='clustering',
-            name='is_active',
+            model_name="clustering",
+            name="is_active",
             field=models.BooleanField(default=True),
         ),
         migrations.AddField(
-            model_name='fullgeneratedarticles',
-            name='is_active',
+            model_name="fullgeneratedarticles",
+            name="is_active",
             field=models.BooleanField(default=True),
         ),
         migrations.AddField(
-            model_name='sampleclusterdata',
-            name='is_active',
+            model_name="sampleclusterdata",
+            name="is_active",
             field=models.BooleanField(default=True),
         ),
         migrations.AddField(
-            model_name='singledaysummary',
-            name='is_active',
+            model_name="singledaysummary",
+            name="is_active",
             field=models.BooleanField(default=True),
         ),
         migrations.CreateModel(
-            name='SimilarClusters',
+            name="SimilarClusters",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('similarity_value', models.FloatField()),
-                ('similarity_metric', models.TextField()),
-                ('similarity_model', models.TextField(null=True)),
-                ('is_active', models.BooleanField(default=True)),
-                ('source', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='source_cluster', to='creator.cluster')),
-                ('target', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='target_cluster', to='creator.cluster')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("similarity_value", models.FloatField()),
+                ("similarity_metric", models.TextField()),
+                ("similarity_model", models.TextField(null=True)),
+                ("is_active", models.BooleanField(default=True)),
+                (
+                    "source",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="source_cluster",
+                        to="creator.cluster",
+                    ),
+                ),
+                (
+                    "target",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="target_cluster",
+                        to="creator.cluster",
+                    ),
+                ),
             ],
         ),
     ]

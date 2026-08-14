@@ -15,41 +15,90 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='PublicSSESettings',
+            name="PublicSSESettings",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('news_collection_name', models.TextField()),
-                ('news_collection_description', models.TextField()),
-                ('news_collection_display_name', models.TextField()),
-                ('news_embedder_index_type', models.TextField()),
-                ('news_embedder_model_name', models.TextField()),
-                ('news_embedder_model_size', models.IntegerField()),
-                ('news_reranker_model_name', models.TextField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("news_collection_name", models.TextField()),
+                ("news_collection_description", models.TextField()),
+                ("news_collection_display_name", models.TextField()),
+                ("news_embedder_index_type", models.TextField()),
+                ("news_embedder_model_name", models.TextField()),
+                ("news_embedder_model_size", models.IntegerField()),
+                ("news_reranker_model_name", models.TextField()),
             ],
         ),
         migrations.CreateModel(
-            name='SystemSettings',
+            name="SystemSettings",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('actual_settings', models.BooleanField()),
-                ('settings_date', models.DateTimeField(auto_now_add=True)),
-                ('doing_news_indexing', models.BooleanField(default=False)),
-                ('doing_news_summarization', models.BooleanField(default=False)),
-                ('doing_news_semantic_indexing', models.BooleanField(default=False)),
-                ('last_news_indexing_check_begin', models.DateTimeField(null=True)),
-                ('last_news_indexing_check_end', models.DateTimeField(null=True)),
-                ('last_news_summarization_check_begin', models.DateTimeField(null=True)),
-                ('last_news_summarization_check_end', models.DateTimeField(null=True)),
-                ('last_news_semantic_indexing_check_begin', models.DateTimeField(null=True)),
-                ('last_news_semantic_indexing_check_end', models.DateTimeField(null=True)),
-                ('public_stream_news_sse_settings', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='system.publicssesettings')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("actual_settings", models.BooleanField()),
+                ("settings_date", models.DateTimeField(auto_now_add=True)),
+                ("doing_news_indexing", models.BooleanField(default=False)),
+                ("doing_news_summarization", models.BooleanField(default=False)),
+                ("doing_news_semantic_indexing", models.BooleanField(default=False)),
+                ("last_news_indexing_check_begin", models.DateTimeField(null=True)),
+                ("last_news_indexing_check_end", models.DateTimeField(null=True)),
+                (
+                    "last_news_summarization_check_begin",
+                    models.DateTimeField(null=True),
+                ),
+                (
+                    "last_news_summarization_check_end",
+                    models.DateTimeField(null=True),
+                ),
+                (
+                    "last_news_semantic_indexing_check_begin",
+                    models.DateTimeField(null=True),
+                ),
+                (
+                    "last_news_semantic_indexing_check_end",
+                    models.DateTimeField(null=True),
+                ),
+                (
+                    "public_stream_news_sse_settings",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="system.publicssesettings",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='SystemUser',
+            name="SystemUser",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('auth_user', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "auth_user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
     ]

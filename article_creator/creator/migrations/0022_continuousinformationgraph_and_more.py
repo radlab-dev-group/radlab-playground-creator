@@ -7,54 +7,98 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0021_singledaysummary_is_active'),
+        ("creator", "0021_singledaysummary_is_active"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ContinuousInformationGraph',
+            name="ContinuousInformationGraph",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('when_created', models.DateTimeField(auto_now=True)),
-                ('description', models.TextField(null=True)),
-                ('is_active', models.BooleanField(default=True)),
-                ('has_sub_graphs', models.BooleanField(default=True)),
-                ('graph_directory', models.TextField(null=True)),
-                ('graph_file_name', models.TextField(null=True)),
-                ('info', models.JSONField(default=dict)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("when_created", models.DateTimeField(auto_now=True)),
+                ("description", models.TextField(null=True)),
+                ("is_active", models.BooleanField(default=True)),
+                ("has_sub_graphs", models.BooleanField(default=True)),
+                ("graph_directory", models.TextField(null=True)),
+                ("graph_file_name", models.TextField(null=True)),
+                ("info", models.JSONField(default=dict)),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='ContinuousInformationSubGraph',
+            name="ContinuousInformationSubGraph",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('when_created', models.DateTimeField(auto_now=True)),
-                ('name', models.TextField(null=True)),
-                ('comment', models.TextField(null=True)),
-                ('article', models.TextField(null=True)),
-                ('info', models.JSONField(null=True)),
-                ('is_active', models.BooleanField(default=True)),
-                ('label', models.IntegerField()),
-                ('label_str', models.TextField()),
-                ('graph', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='continuous_sub_graph', to='creator.continuousinformationgraph')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("when_created", models.DateTimeField(auto_now=True)),
+                ("name", models.TextField(null=True)),
+                ("comment", models.TextField(null=True)),
+                ("article", models.TextField(null=True)),
+                ("info", models.JSONField(null=True)),
+                ("is_active", models.BooleanField(default=True)),
+                ("label", models.IntegerField()),
+                ("label_str", models.TextField()),
+                (
+                    "graph",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="continuous_sub_graph",
+                        to="creator.continuousinformationgraph",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='ClustersInContinuousInformationSubGraph',
+            name="ClustersInContinuousInformationSubGraph",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('when_created', models.DateTimeField(auto_now=True)),
-                ('cluster', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='creator.cluster')),
-                ('sub_graph', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='clusters_in_continuous_sub_graph', to='creator.continuousinformationsubgraph')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("when_created", models.DateTimeField(auto_now=True)),
+                (
+                    "cluster",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="creator.cluster",
+                    ),
+                ),
+                (
+                    "sub_graph",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="clusters_in_continuous_sub_graph",
+                        to="creator.continuousinformationsubgraph",
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('cluster', 'sub_graph')},
+                "unique_together": {("cluster", "sub_graph")},
             },
         ),
     ]

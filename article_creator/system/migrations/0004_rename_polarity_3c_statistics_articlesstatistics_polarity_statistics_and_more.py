@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('system', '0003_articlesstatistics_and_more'),
+        ("system", "0003_articlesstatistics_and_more"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='articlesstatistics',
-            old_name='polarity_3c_statistics',
-            new_name='polarity_statistics',
+            model_name="articlesstatistics",
+            old_name="polarity_3c_statistics",
+            new_name="polarity_statistics",
         ),
         migrations.AddField(
-            model_name='articlesstatistics',
-            name='are_actual',
+            model_name="articlesstatistics",
+            name="are_actual",
             field=models.BooleanField(default=False),
         ),
     ]

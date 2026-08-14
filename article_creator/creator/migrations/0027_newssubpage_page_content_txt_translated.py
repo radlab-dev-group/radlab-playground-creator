@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0026_continuousinformationsubgraph_type_str'),
+        ("creator", "0026_continuousinformationsubgraph_type_str"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='newssubpage',
-            name='page_content_txt_translated',
+            model_name="newssubpage",
+            name="page_content_txt_translated",
             field=models.TextField(null=True),
         ),
     ]

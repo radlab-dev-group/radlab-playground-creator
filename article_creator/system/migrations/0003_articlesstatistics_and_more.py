@@ -7,22 +7,34 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('system', '0002_systemsettings_doing_news_pli_check_and_more'),
+        ("system", "0002_systemsettings_doing_news_pli_check_and_more"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ArticlesStatistics',
+            name="ArticlesStatistics",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('statistics_date', models.DateTimeField(auto_now_add=True)),
-                ('pages_statistics', models.JSONField()),
-                ('polarity_3c_statistics', models.JSONField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("statistics_date", models.DateTimeField(auto_now_add=True)),
+                ("pages_statistics", models.JSONField()),
+                ("polarity_3c_statistics", models.JSONField()),
             ],
         ),
         migrations.AddField(
-            model_name='systemsettings',
-            name='last_articles_stats',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='system.articlesstatistics'),
+            model_name="systemsettings",
+            name="last_articles_stats",
+            field=models.ForeignKey(
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                to="system.articlesstatistics",
+            ),
         ),
     ]

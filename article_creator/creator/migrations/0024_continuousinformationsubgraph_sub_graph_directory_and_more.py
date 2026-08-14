@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0023_continuousinformationgraph_summary_and_more'),
+        ("creator", "0023_continuousinformationgraph_summary_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='continuousinformationsubgraph',
-            name='sub_graph_directory',
+            model_name="continuousinformationsubgraph",
+            name="sub_graph_directory",
             field=models.TextField(null=True),
         ),
         migrations.AddField(
-            model_name='continuousinformationsubgraph',
-            name='sub_graph_file_name',
+            model_name="continuousinformationsubgraph",
+            name="sub_graph_file_name",
             field=models.TextField(null=True),
         ),
     ]

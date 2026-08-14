@@ -7,32 +7,46 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0015_clustering_sampleclusterdata_cluster'),
+        ("creator", "0015_clustering_sampleclusterdata_cluster"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='cluster',
-            name='sample_indices',
+            model_name="cluster",
+            name="sample_indices",
             field=models.JSONField(null=True),
         ),
         migrations.AddField(
-            model_name='clustering',
-            name='genai_article_prompt',
+            model_name="clustering",
+            name="genai_article_prompt",
             field=models.TextField(null=True),
         ),
         migrations.AddField(
-            model_name='clustering',
-            name='genai_labels_prompt',
+            model_name="clustering",
+            name="genai_labels_prompt",
             field=models.TextField(null=True),
         ),
         migrations.CreateModel(
-            name='SingleDaySummary',
+            name="SingleDaySummary",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('day_to_summary', models.DateField()),
-                ('when_generated', models.DateTimeField(auto_now=True)),
-                ('clustering', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='creator.clustering')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("day_to_summary", models.DateField()),
+                ("when_generated", models.DateTimeField(auto_now=True)),
+                (
+                    "clustering",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="creator.clustering",
+                    ),
+                ),
             ],
         ),
     ]

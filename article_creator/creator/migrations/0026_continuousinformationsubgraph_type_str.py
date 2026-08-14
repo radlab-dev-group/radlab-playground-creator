@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('creator', '0025_alter_continuousinformationsubgraph_label'),
+        ("creator", "0025_alter_continuousinformationsubgraph_label"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='continuousinformationsubgraph',
-            name='type_str',
-            field=models.TextField(default=''),
+            model_name="continuousinformationsubgraph",
+            name="type_str",
+            field=models.TextField(default=""),
         ),
     ]
