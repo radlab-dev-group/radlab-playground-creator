@@ -3,7 +3,9 @@
 export PLAYGROUND_PUBLIC_USER_NAME=XYZ
 export PLAYGROUND_PUBLIC_USER_PASS=XYZ
 
-export CUDA_VISIBLE_DEVICES=
+export CUDA_VISIBLE_DEVICES=1
+
+export CROSS_ENCODER_DEVICE="cuda:0"
 
 APP_FILE=generate_news_for_public_stream.py
 

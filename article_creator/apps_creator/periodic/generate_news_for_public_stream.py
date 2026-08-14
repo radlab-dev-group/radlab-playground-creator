@@ -51,7 +51,11 @@ def main(argv=None):
 
         if len(articles_to_summarize) and not args.without_ce_sim:
             logging.info(f"Loading CE model {args.cross_encoder_model}...")
-            ce_sim_model = CrossEncoder(args.cross_encoder_model)
+
+            ce_device = os.environ.get("CROSS_ENCODER_DEVICE", "auto")
+            logging.info(f"CrossEncoder device: {ce_device}")
+
+            ce_sim_model = CrossEncoder(args.cross_encoder_model, device=ce_device)
             logging.info(
                 f"Model {args.cross_encoder_model} is loaded, "
                 f"starting news generation"
