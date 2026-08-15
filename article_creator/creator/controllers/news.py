@@ -363,17 +363,30 @@ class NewsController:
         orig_article_str_translated = None
 
         if news_sub_page.main_page.language != "pl":
-            orig_article_str_translated = self.__translate_to_pl(
-                text=orig_article_str
-            )
+            if news_sub_page.page_content_txt_translated is None or not len(
+                news_sub_page.page_content_txt_translated
+            ):
+                orig_article_str_translated = self.__translate_to_pl(
+                    text=orig_article_str
+                )
+            else:
+                orig_article_str_translated = (
+                    news_sub_page.page_content_txt_translated
+                )
             news_sub_page.page_content_txt_translated = orig_article_str_translated
             if self._add_to_db:
                 NewsSubPage.objects.filter(pk=news_sub_page.pk).update(
                     page_content_txt_translated=orig_article_str_translated
                 )
 
+        _orig_text = orig_article_str
+        if orig_article_str_translated is not None and len(
+            orig_article_str_translated
+        ):
+            _orig_text = orig_article_str_translated
+
         gen_article_str, gen_time, model_name = self._generate_news_from_article(
-            article_str=orig_article_str_translated or orig_article_str
+            article_str=_orig_text
         )
 
         logging.info("==" * 50)
