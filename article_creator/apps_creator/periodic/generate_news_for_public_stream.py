@@ -1,6 +1,6 @@
-import datetime
 import os
 import random
+import datetime
 
 import django
 import logging
@@ -28,19 +28,23 @@ def main(argv=None):
         help="Cross-Encoder model in case when similarity should be calculated "
         "between generated news and the original article.",
     )
+
+    def _parse_date(value: str):
+        return datetime.date.fromisoformat(value)
+
     parser.add_argument(
         "--begin-date",
         dest="begin_date",
         help="Begin date in format YYYY-MM-DD",
-        type=datetime.date,
-        required=False
+        type=_parse_date,
+        required=False,
     )
 
     parser.add_argument(
         "--end-date",
         dest="end_date",
         help="End date in format YYYY-MM-DD",
-        type=datetime.date,
+        type=_parse_date,
         required=False,
     )
 

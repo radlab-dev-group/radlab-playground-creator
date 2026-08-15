@@ -280,8 +280,8 @@ class NewsController:
 
     @staticmethod
     def public_subpages_without_summarization(
-            begin_date: Optional[datetime.date] = None,
-            end_date: Optional[datetime.date] = None,
+        begin_date: Optional[datetime.date] = None,
+        end_date: Optional[datetime.date] = None,
     ) -> QuerySet[NewsSubPage]:
         """
         Returns list of subpages where:
@@ -292,8 +292,8 @@ class NewsController:
 
         filter_params = {
             "main_page__prepare_news": True,
-        "has_generated_news": False,
-        "skip_subpage": False,
+            "has_generated_news": False,
+            "skip_subpage": False,
         }
 
         if begin_date:
