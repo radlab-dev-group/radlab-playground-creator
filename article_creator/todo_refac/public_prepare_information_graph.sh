@@ -4,7 +4,6 @@
 
 APP_FILE=build_information_graph.py
 APP_FILE_2=similar_sub_graphs_extractor.py
-MAIN_DIR=/mnt/local/dev/radlab-article-creator
 APP_VISUALISER_GRAPHS="../../radlab-graph-visualiser/graph-visualiser/llms/outdir-plg-graphs/"
 
 MAIN_OUT_DIR="resources/info_graphs"
@@ -12,16 +11,16 @@ MAIN_OUT_DIR="resources/info_graphs"
 DATE_STR=$(date +%Y%m%d_%H%M%S)
 OUT_DIR="${MAIN_OUT_DIR}/${DATE_STR}"
 
-MAIN_PROJECT_DIR=${MAIN_DIR}/article_creator
+MAIN_PROJECT_DIR=$(pwd)
 PERIODIC_APPS_DIR=${MAIN_PROJECT_DIR}/apps_creator/admin
 
 APP_FILE_PATH_PERIODIC_APPS_DIR="${PERIODIC_APPS_DIR}/${APP_FILE}"
 APP_FILE_PATH_MAIN_PROJECT_DIR="${MAIN_PROJECT_DIR}/${APP_FILE}"
-cp "${APP_FILE_PATH_PERIODIC_APPS_DIR}" ${APP_FILE_PATH_MAIN_PROJECT_DIR}
+cp "${APP_FILE_PATH_PERIODIC_APPS_DIR}" "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
 
 APP_FILE_PATH_PERIODIC_APPS_DIR_2="${PERIODIC_APPS_DIR}/${APP_FILE_2}"
 APP_FILE_PATH_MAIN_PROJECT_DIR_2="${MAIN_PROJECT_DIR}/${APP_FILE_2}"
-cp "${APP_FILE_PATH_PERIODIC_APPS_DIR_2}" ${APP_FILE_PATH_MAIN_PROJECT_DIR_2}
+cp "${APP_FILE_PATH_PERIODIC_APPS_DIR_2}" "${APP_FILE_PATH_MAIN_PROJECT_DIR_2}"
 
 cd "${MAIN_PROJECT_DIR}" || return
 

@@ -105,7 +105,7 @@ def main(argv=None):
         news_controller = NewsController(add_to_db=True, seconds_prev_check=0)
         json_config = load_json_config(args.json_config)
         categories = add_categories(
-            json_config.get("categories", {}), main_news_controller, debug=False
+            json_config.get("categories", {}), main_news_controller, debug=args.debug
         )
         add_main_urls(
             json_config.get("main_urls", []), main_news_controller, categories
