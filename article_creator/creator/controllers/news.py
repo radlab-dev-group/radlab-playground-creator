@@ -279,18 +279,31 @@ class NewsController:
         return news_subpages
 
     @staticmethod
-    def public_subpages_without_summarization() -> QuerySet[NewsSubPage]:
+    def public_subpages_without_summarization(
+            begin_date: Optional[datetime.date] = None,
+            end_date: Optional[datetime.date] = None,
+    ) -> QuerySet[NewsSubPage]:
         """
         Returns list of subpages where:
           - main_page has prepare_news a set as True
           - subpage does not have the summary yet
         :return: List of NewsSubpage objects ordered by id
         """
-        return NewsSubPage.objects.filter(
-            main_page__prepare_news=True,
-            has_generated_news=False,
-            skip_subpage=False,
-        ).order_by("id")
+
+        filter_params = {
+            "main_page__prepare_news": True,
+        "has_generated_news": False,
+        "skip_subpage": False,
+        }
+
+        if begin_date:
+            filter_params["when_crawled__gte"] = begin_date
+
+        if end_date:
+            # __lt + next day ensures full calendar day of end_date is included
+            filter_params["when_crawled__lt"] = end_date + datetime.timedelta(days=1)
+
+        return NewsSubPage.objects.filter(**filter_params).order_by("id")
 
     @staticmethod
     def public_get_generated_news_for_date_range(
