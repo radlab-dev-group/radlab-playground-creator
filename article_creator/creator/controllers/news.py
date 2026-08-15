@@ -322,7 +322,7 @@ class NewsController:
     def __translate_to_pl(self, text: str) -> str:
         with self.__llm_router_client() as llm_router:
             j_result = llm_router.translate(
-                payload={"max_new_tokens": len(text), "texts": [text]}
+                temperature=0.5, max_new_tokens=len(text), texts=[text]
             )
 
         if not j_result or not "response" in j_result:
