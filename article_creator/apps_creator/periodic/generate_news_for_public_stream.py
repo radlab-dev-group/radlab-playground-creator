@@ -46,14 +46,6 @@ def main(argv=None):
 
     args = parser.parse_args()
 
-    # Parse optional date arguments
-    begin_date = None
-    end_date = None
-    if args.begin_date:
-        begin_date = datetime.date.fromisoformat(args.begin_date)
-    if args.end_date:
-        end_date = datetime.date.fromisoformat(args.end_date)
-
     system_settings = SystemController.get_system_settings()
     if system_settings.doing_news_summarization:
         return
@@ -70,7 +62,7 @@ def main(argv=None):
 
         articles_to_summarize = (
             news_controller.public_subpages_without_summarization(
-                begin_date=begin_date, end_date=end_date
+                begin_date=args.begin_date, end_date=args.end_date
             )
         )
 
