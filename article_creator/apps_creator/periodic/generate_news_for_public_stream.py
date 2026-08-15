@@ -48,6 +48,8 @@ def main(argv=None):
         required=False,
     )
 
+    parser.add_argument("--dont-shuffle", dest="dont_shuffle", action="store_true")
+
     args = parser.parse_args()
 
     system_settings = SystemController.get_system_settings()
@@ -72,42 +74,43 @@ def main(argv=None):
 
         logging.info(f"Number of articles: {len(articles_to_summarize)}")
 
-        # articles_to_summarize = list(articles_to_summarize)
-        # random.shuffle(articles_to_summarize)
-        #
-        # if len(articles_to_summarize) and not args.without_ce_sim:
-        #     logging.info(f"Loading CE model {args.cross_encoder_model}...")
-        #
-        #     ce_device = os.environ.get("CROSS_ENCODER_DEVICE", "auto")
-        #     logging.info(f"CrossEncoder device: {ce_device}")
-        #
-        #     ce_sim_model = CrossEncoder(args.cross_encoder_model, device=ce_device)
-        #     logging.info(
-        #         f"Model {args.cross_encoder_model} is loaded, "
-        #         f"starting news generation"
-        #     )
-        #
-        # all_generated_news = []
-        # art_to_sum_count = len(articles_to_summarize)
-        # for news_num, news_sub_page in enumerate(articles_to_summarize):
-        #     logging.info(
-        #         f"[{news_num}/{art_to_sum_count}] "
-        #         f"Generating news for {news_sub_page.news_url}"
-        #     )
-        #
-        #     generated_news = news_controller.generate_news(
-        #         news_sub_page=news_sub_page, cross_encoder_sim_model=ce_sim_model
-        #     )
-        #     if generated_news is None:
-        #         logging.warning(
-        #             f"Problem occurred while generating news for "
-        #             f"{news_sub_page.news_url} "
-        #         )
-        #         continue
-        #
-        #     all_generated_news.append(generated_news)
-        #
-        # logging.info(f"Generated {len(all_generated_news)} news")
+        articles_to_summarize = list(articles_to_summarize)
+        if not args.dont_shuffle:
+            random.shuffle(articles_to_summarize)
+
+        if len(articles_to_summarize) and not args.without_ce_sim:
+            logging.info(f"Loading CE model {args.cross_encoder_model}...")
+
+            ce_device = os.environ.get("CROSS_ENCODER_DEVICE", "auto")
+            logging.info(f"CrossEncoder device: {ce_device}")
+
+            ce_sim_model = CrossEncoder(args.cross_encoder_model, device=ce_device)
+            logging.info(
+                f"Model {args.cross_encoder_model} is loaded, "
+                f"starting news generation"
+            )
+
+        all_generated_news = []
+        art_to_sum_count = len(articles_to_summarize)
+        for news_num, news_sub_page in enumerate(articles_to_summarize):
+            logging.info(
+                f"[{news_num}/{art_to_sum_count}] "
+                f"Generating news for {news_sub_page.news_url}"
+            )
+
+            generated_news = news_controller.generate_news(
+                news_sub_page=news_sub_page, cross_encoder_sim_model=ce_sim_model
+            )
+            if generated_news is None:
+                logging.warning(
+                    f"Problem occurred while generating news for "
+                    f"{news_sub_page.news_url} "
+                )
+                continue
+
+            all_generated_news.append(generated_news)
+
+        logging.info(f"Generated {len(all_generated_news)} news")
     except Exception as e:
         logging.error(e)
 
