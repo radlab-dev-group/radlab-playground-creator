@@ -43,8 +43,8 @@ from creator.serializers import (
 
 class ProperNewsParameters:
     language: str = "pl"
-    min_length: int = 125
-    min_sim_to_original: float = 0.501
+    min_length: int = 100
+    min_sim_to_original: float = 0.48
     max_num_of_generated_news: int = 4
     soft_num_of_generated_news: int = 2
 
