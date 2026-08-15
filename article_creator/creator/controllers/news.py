@@ -290,7 +290,7 @@ class NewsController:
         :return: List of NewsSubpage objects ordered by id
         """
 
-        filter_params = {
+        filter_params: Dict[str, Any] = {
             "main_page__prepare_news": True,
             "has_generated_news": False,
             "skip_subpage": False,
