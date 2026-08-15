@@ -426,6 +426,7 @@ class NewsController:
                 show_news=show_news,
                 news_sub_page=news_sub_page,
                 similarity_to_original=gen_news_sim,
+                show_admin_message=False,
             )
         else:
             gen_news = GeneratedNews(
@@ -436,6 +437,7 @@ class NewsController:
                 show_news=show_news,
                 news_sub_page=news_sub_page,
                 similarity_to_original=gen_news_sim,
+                show_admin_message=False,
             )
 
         self.__validate_news_and_subpage(
