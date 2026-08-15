@@ -155,6 +155,7 @@ class NewsController:
     MAIN_NEWS_STREAM_LLM_ROUTER_HOST = "llm_router_host"
     MAIN_NEWS_STREAM_LLM_ROUTER_TOKEN = "llm_router_token"
     MAIN_NEWS_STREAM_LLM_ROUTER_MODEL = "llm_router_model"
+    MAIN_NEWS_STREAM_LLM_ROUTER_TIMEOUT = "llm_router_timeout"
 
     ####
     MAIN_NEWS_CREATOR_GENERATE_ARTICLE = "generate_article_from_search_result"
@@ -317,6 +318,7 @@ class NewsController:
             default_model=self._models_config[
                 self.MAIN_NEWS_STREAM_LLM_ROUTER_MODEL
             ],
+            timeout=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_TIMEOUT],
         )
 
     def __translate_to_pl(self, text: str) -> str:
