@@ -1,8 +1,7 @@
-import logging
 import os
 import random
-
 import django
+import logging
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "main.settings")
 django.setup()
@@ -59,6 +58,12 @@ def prepare_generation_parser(argv=None):
         default=1,
         help="Number of workers for parallel news generation.",
     )
+    parser.add_argument(
+        "--ce-sim-host",
+        dest="ce_sim_host",
+        default=os.environ.get("CROSS_ENCODER_API_URL", "http://127.0.0.1:8085"),
+        help="Host URL of Cross-Encoder Flask API service (used when num_workers > 1).",
+    )
     return parser
 
 
@@ -91,16 +96,27 @@ def main(argv=None):
             random.shuffle(articles_to_summarize)
 
         ce_sim_model = None
+        ce_sim_host = None
         if articles_to_summarize and not args.without_ce_sim:
-            ce_sim_model = load_cross_encoder_model(
-                model_name=args.cross_encoder_model
-            )
-            logging.info("Starting news generation...")
+            if args.num_workers > 1:
+                ce_sim_host = args.ce_sim_host
+                logging.info(
+                    f"Using Cross-Encoder API service at {ce_sim_host} "
+                    f"for {args.num_workers} parallel workers."
+                )
+            else:
+                ce_sim_model = load_cross_encoder_model(
+                    model_name=args.cross_encoder_model
+                )
+                logging.info(
+                    "Starting news generation with local CrossEncoder model..."
+                )
 
         all_generated_news = generate_news_parallel(
             news_controller=news_controller,
             articles=articles_to_summarize,
             cross_encoder_model=ce_sim_model,
+            ce_sim_host=ce_sim_host,
             num_workers=args.num_workers,
         )
 

@@ -16,6 +16,7 @@ from radlab_data.text.utils import TextUtils
 from radlab_data.text.processors.splitter import SentenceSplitter
 
 from llm_router_lib.client import LLMRouterClient
+from services.cross_encoder_client import CrossEncoderApiClient
 
 from creator.models import SystemUser, Clustering
 from general.api_utils import BasePublicApiInterface
@@ -345,7 +346,10 @@ class NewsController:
         return j_result["response"][0]["translated"]
 
     def generate_news(
-        self, news_sub_page: NewsSubPage, cross_encoder_sim_model=None
+        self,
+        news_sub_page: NewsSubPage,
+        cross_encoder_sim_model=None,
+        ce_sim_host: Optional[str] = None,
     ) -> GeneratedNews | None:
         assert self._models_config is not None
 
@@ -408,7 +412,14 @@ class NewsController:
         article_language = self.__check_language(text=gen_article_str)
 
         gen_news_sim = None
-        if cross_encoder_sim_model is not None:
+        if ce_sim_host is not None:
+            ce_client = CrossEncoderApiClient(api_url=ce_sim_host)
+            gen_news_sim = ce_client.calculate_similarity(
+                gen_text=gen_article_str,
+                orig_text=orig_article_str,
+                ce_model_max_tokens=512,
+            )
+        elif cross_encoder_sim_model is not None:
             gen_news_sim = self._calculate_similarity_ce(
                 gen_article_str=gen_article_str,
                 orig_article_str=orig_article_str,

@@ -31,6 +31,7 @@ def generate_news_parallel(
     news_controller: NewsController,
     articles: Sequence[NewsSubPage],
     cross_encoder_model: Optional[CrossEncoder] = None,
+    ce_sim_host: Optional[str] = None,
     num_workers: int = 1,
 ) -> List[GeneratedNews]:
     """
@@ -39,6 +40,7 @@ def generate_news_parallel(
     :param news_controller: NewsController instance to generate news
     :param articles: Collection of NewsSubPage instances to summarize
     :param cross_encoder_model: Optional CrossEncoder model for similarity calculation
+    :param ce_sim_host: Optional host URL for CrossEncoder API service
     :param num_workers: Number of worker threads (default: 1)
     :return: List of successfully generated GeneratedNews objects
     """
@@ -67,6 +69,7 @@ def generate_news_parallel(
                 generated_news = news_controller.generate_news(
                     news_sub_page=news_sub_page,
                     cross_encoder_sim_model=cross_encoder_model,
+                    ce_sim_host=ce_sim_host,
                 )
                 if generated_news is None:
                     logging.warning(
