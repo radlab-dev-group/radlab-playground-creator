@@ -4,17 +4,20 @@ import random
 import hashlib
 import logging
 import datetime
+
 import requests
 import urllib.request
 
 from bs4 import BeautifulSoup
-from typing import List, Dict, Tuple, Any, Optional
 from django.db.models import Q, QuerySet
+from typing import List, Dict, Tuple, Any, Optional
 
 from radlab_data.text.utils import TextUtils
+from radlab_data.text.processors.splitter import SentenceSplitter
 
-from creator.models import SystemUser, GeneratedNews, Clustering, NewsMainPage
+from llm_router_lib.client import LLMRouterClient
 
+from creator.models import SystemUser, Clustering
 from general.api_utils import BasePublicApiInterface
 from general.constants import DEFAULT_MODELS_CONFIG
 
@@ -147,18 +150,22 @@ class MainNewsController:
 class NewsController:
     MAX_PUBLIC_NEWS_CHAR_LENGTH = 10000
     MIN_ARTICLE_LEN_TO_GENERATE_NEWS = 150
+
     MAIN_NEWS_STREAM_PUBLIC_JSON_FIELD = "stream_news_free"
-    MAIN_NEWS_STREAM_GENERATE_ARTICLE = "generate_article_from_text"
+    MAIN_NEWS_STREAM_LLM_ROUTER_HOST = "llm_router_host"
+    MAIN_NEWS_STREAM_LLM_ROUTER_TOKEN = "llm_router_token"
+    MAIN_NEWS_STREAM_LLM_ROUTER_MODEL = "llm_router_model"
+    MAIN_NEWS_STREAM_LLM_ROUTER_TIMEOUT = "llm_router_timeout"
+
+    ####
     MAIN_NEWS_CREATOR_GENERATE_ARTICLE = "generate_article_from_search_result"
     API_HEADER = {"Content-Type": "application/json; charset=utf-8"}
-
-    MODEL_TO_NEWS_SIMILARITY_CALCULATION_CE = "radlab/polish-cross-encoder"
 
     def __init__(
         self,
         add_to_db: bool = True,
         seconds_prev_check: int = 0,
-        models_config_path: str or None = DEFAULT_MODELS_CONFIG,
+        models_config_path: Optional[str] = DEFAULT_MODELS_CONFIG,
     ):
         """
         Initialize controller
@@ -172,6 +179,8 @@ class NewsController:
 
         self._models_config = None
         self._models_config_path = models_config_path
+
+        self._splitter = SentenceSplitter()
 
         if models_config_path is not None and len(models_config_path.strip()):
             self._load_models_config(models_config_path)
@@ -293,12 +302,39 @@ class NewsController:
             when_generated__gte=begin_date,
         )
 
+    def __llm_router_client(self) -> LLMRouterClient:
+        """
+        Creates and returns an instance of LLMRouterClient configured for the main
+        news stream routing service.
+
+        Returns:
+            LLMRouterClient: An instance of the LLMRouterClient, initialized with
+            API endpoint, authentication token, and default model extracted from the
+            configuration.
+        """
+        return LLMRouterClient(
+            api=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_HOST],
+            token=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_TOKEN],
+            default_model=self._models_config[
+                self.MAIN_NEWS_STREAM_LLM_ROUTER_MODEL
+            ],
+            timeout=self._models_config[self.MAIN_NEWS_STREAM_LLM_ROUTER_TIMEOUT],
+        )
+
+    def __translate_to_pl(self, text: str) -> str:
+        with self.__llm_router_client() as llm_router:
+            j_result = llm_router.translate(
+                temperature=0.5, max_new_tokens=len(text), texts=[text]
+            )
+
+        if not j_result or not "response" in j_result:
+            return text
+        return j_result["response"][0]["translated"]
+
     def generate_news(
         self, news_sub_page: NewsSubPage, cross_encoder_sim_model=None
     ) -> GeneratedNews | None:
         assert self._models_config is not None
-        if news_sub_page is None:
-            return None
 
         if (
             len(news_sub_page.page_content_txt.strip())
@@ -311,9 +347,29 @@ class NewsController:
             return None
 
         orig_article_str = news_sub_page.page_content_txt.strip()
-        gen_article_str, gen_time, model_name = self._generate_article_from_article(
-            article_str=orig_article_str
+        orig_article_str_translated = None
+
+        if news_sub_page.main_page.language != "pl":
+            orig_article_str_translated = self.__translate_to_pl(
+                text=orig_article_str
+            )
+            news_sub_page.page_content_txt_translated = orig_article_str_translated
+            if self._add_to_db:
+                NewsSubPage.objects.filter(pk=news_sub_page.pk).update(
+                    page_content_txt_translated=orig_article_str_translated
+                )
+
+        gen_article_str, gen_time, model_name = self._generate_news_from_article(
+            article_str=orig_article_str_translated or orig_article_str
         )
+
+        logging.info("==" * 50)
+        logging.info(orig_article_str)
+        logging.info("--" * 50)
+        logging.info(orig_article_str_translated or "w/o translation")
+        logging.info("--" * 50)
+        logging.info(gen_article_str)
+        logging.info("==" * 50)
 
         news_sub_page.num_of_generated_news += 1
         if gen_article_str is None or not len(gen_article_str):
@@ -330,8 +386,8 @@ class NewsController:
             gen_news_sim = self._calculate_similarity_ce(
                 gen_article_str=gen_article_str,
                 orig_article_str=orig_article_str,
-                cross_encoder_sim_model=cross_encoder_sim_model,
-                ce_model_max_seq_len=514,
+                cross_encoder_model=cross_encoder_sim_model,
+                ce_model_max_tokens=512,
             )
 
         show_news = news_sub_page.main_page.show_news
@@ -485,7 +541,8 @@ class NewsController:
             return
 
         show_news = True
-        if news.similarity_to_original < ProperNewsParameters.min_sim_to_original:
+        sim = news.similarity_to_original
+        if sim is not None and sim < ProperNewsParameters.min_sim_to_original:
             show_news = False
         elif len(news.generated_text) < ProperNewsParameters.min_length:
             show_news = False
@@ -526,60 +583,188 @@ class NewsController:
         return TextUtils.text_language(text)
 
     @staticmethod
+    def _split_to_fixed_chunks(
+        text: str,
+        tokenizer,
+        chunk_size_tokens: int,
+        overlap_window_perc: float = 0.2,
+    ) -> list[str]:
+        """
+        Split *text* into overlapping token-level chunks (sliding window).
+
+        Each chunk covers ``chunk_size_tokens`` tokens; the window advances by
+        80 % of that size, leaving a 20 % overlap between consecutive chunks.
+        No sentence-level splitting is used — raw token streams are sliced.
+
+        Returns the list of decoded chunk strings (stripped). Empty when the
+        text fits into fewer tokens than ``chunk_size_tokens``.
+        """
+        if chunk_size_tokens <= 0:
+            return []
+
+        all_tokens = tokenizer.encode(text)
+        n = len(all_tokens)
+        if n <= chunk_size_tokens:
+            # Entire text fits in one chunk — no need to slide
+            return []
+
+        step = chunk_size_tokens - int(chunk_size_tokens * overlap_window_perc)
+
+        chunks: list[str] = []
+        covered_end = 0
+
+        for start in range(0, n - chunk_size_tokens + 1, step):
+            end = start + chunk_size_tokens
+            chunk_str = tokenizer.decode(all_tokens[start:end])
+            if chunk_str.strip():
+                chunks.append(chunk_str.strip())
+            covered_end = end
+
+        # Final chunk: capture any tokens beyond the last window
+        if covered_end < n:
+            tail = tokenizer.decode(all_tokens[-chunk_size_tokens:])
+            if tail.strip() and (not chunks or chunks[-1] != tail):
+                chunks.append(tail.strip())
+
+        return chunks
+
     def _calculate_similarity_ce(
+        self,
         gen_article_str,
         orig_article_str,
-        cross_encoder_sim_model,
-        ce_model_max_seq_len: int,
-    ) -> float:
+        cross_encoder_model,
+        ce_model_max_tokens: int,
+        special_tokens: int = 2,  # [CLS] + [SEP] for sentence pair
+    ) -> float | None:
+        tokenizer = cross_encoder_model.tokenizer
+        tokens_s1 = len(tokenizer.encode(gen_article_str))
+        tokens_s2 = len(tokenizer.encode(orig_article_str))
 
-        s1 = gen_article_str[: ce_model_max_seq_len - 1]
-        s2 = orig_article_str[: ce_model_max_seq_len - 1]
-        sim_val = cross_encoder_sim_model.predict([(s1, s2)])
-        sim_val = sim_val[0] if len(sim_val) else 0.0
+        if tokens_s1 + tokens_s2 + special_tokens > ce_model_max_tokens:
+            sim_val = self._calculate_similarity_ce_patch_match(
+                gen_article_str,
+                orig_article_str,
+                cross_encoder_model,
+                ce_model_max_tokens,
+                special_tokens,
+            )
+        else:
+            sim_val = cross_encoder_model.predict(
+                [(gen_article_str, orig_article_str)]
+            )
+            sim_val = sim_val[0] if len(sim_val) else 0.0
+
         return sim_val
 
-    def _generate_article_from_article(
+    def _calculate_similarity_ce_patch_match(
+        self,
+        gen_text: str,
+        orig_text: str,
+        cross_encoder_model,
+        ce_max_tokens: int,
+        special_tokens: int,
+    ) -> float | None:
+        """
+        Calculates the similarity between generated text and original text using a cross-encoder model with patch matching.
+
+        This method employs a process to compare sentences from the generated text with chunks of the
+        original text, determining the similarity based on a cross-encoder model's prediction.
+        The process includes sentence splitting, tokenization, fixed-size chunking,
+        batch prediction, and result aggregation.
+
+        Parameters:
+        gen_text: str
+            The generated text to compare.
+        orig_text: str
+            The original text to compare against.
+        cross_encoder_model
+            The cross-encoder model used for similarity prediction.
+        ce_max_tokens: int
+            The maximum number of tokens allowed by the cross-encoder model per input pair.
+        special_tokens: int
+            The number of special tokens reserved for the model's tokenizer.
+
+        Returns:
+        float or None
+            A similarity score between the generated and original text, averaged over all
+            sentences in the generated text. Returns None if no valid pairings or computations
+            can be made (e.g., constraints exceed token limits).
+        """
+        # 1. Split gen_text into sentences
+        gen_sentences = [s for s in self._splitter.split(gen_text) if s]
+        if not gen_sentences:
+            return None
+
+        # 2. Find longest gen sentence (token count)
+        tokenizer = cross_encoder_model.tokenizer
+        gen_token_lengths = [len(tokenizer.encode(s)) for s in gen_sentences]
+        max_gen_tokens = max(gen_token_lengths)
+
+        # 3. Compute global chunk budget for orig_text
+        chunk_size = ce_max_tokens - max_gen_tokens - special_tokens
+        if chunk_size <= 0:
+            logging.warning(
+                f"Patch matching fallback: longest gen sentence ({max_gen_tokens} tokens) "
+                f"exceeds CE token limit {ce_max_tokens} (budget = {chunk_size})."
+            )
+            return None
+
+        # 4. Split orig_text into fixed-size chunks
+        orig_chunks = self._split_to_fixed_chunks(orig_text, tokenizer, chunk_size)
+        if not orig_chunks:
+            logging.warning(
+                f"Patch matching fallback: orig_text could not form any chunk "
+                f"(budget {chunk_size} tokens too small)."
+            )
+            return None
+
+        # 5. Build valid (gen_idx, chunk_idx) pairs — cache gen token lengths
+        valid_pairs: list[tuple[int, int]] = []
+        for gi, gs in enumerate(gen_sentences):
+            for ci, chunk_text in enumerate(orig_chunks):
+                valid_pairs.append((gi, ci))
+                # if gen_token_lengths[gi] + len(tokenizer.encode(chunk_text)) + special_tokens <= ce_max_tokens:
+                #     valid_pairs.append((gi, ci))
+
+        if not valid_pairs:
+            logging.warning(
+                f"Patch matching fallback: no (gen_sentence, orig_chunk) pair fits "
+                f"within the token limit {ce_max_tokens}."
+            )
+            return None
+
+        # 6. Batch predict
+        batch = [(gen_sentences[gi], orig_chunks[ci]) for gi, ci in valid_pairs]
+        scores = cross_encoder_model.predict(batch)
+
+        # 7. Per-gen-sentence: max similarity across all chunks (Max Pooling)
+        gen_max_sims: list[float] = [0.0] * len(gen_sentences)
+        for (gi, _), score in zip(valid_pairs, scores):
+            if gi < len(gen_max_sims):
+                gen_max_sims[gi] = max(gen_max_sims[gi], float(score))
+
+        # 8. Aggregate result
+        result_sim = None
+        matched_count = sum(1 for s in gen_max_sims if s > 0.0)
+        if matched_count > 0:
+            result_sim = float(sum(gen_max_sims) / len(gen_max_sims))
+        return result_sim
+
+    def _generate_news_from_article(
         self, article_str: str
     ) -> (str | None, float | None, str | None):
+
         if len(article_str) > self.MAX_PUBLIC_NEWS_CHAR_LENGTH:
             article_str = article_str[: self.MAX_PUBLIC_NEWS_CHAR_LENGTH]
 
-        model_name = self._models_config[self.MAIN_NEWS_STREAM_GENERATE_ARTICLE][
-            "model_name"
-        ]
-        model_host = self._models_config[self.MAIN_NEWS_STREAM_GENERATE_ARTICLE][
-            "model_hosts"
-        ][0]
-        prepare_article_ep = self._models_config[
-            self.MAIN_NEWS_STREAM_GENERATE_ARTICLE
-        ]["ep"]["prepare_article"]
-        ep_url = f"{model_host.strip('/')}/{prepare_article_ep.strip('/')}"
-
-        ep_data = {
-            "text": article_str,
-            "model_name": model_name,
-            "top_k": 0,
-            "top_p": 0.90,
-            "max_new_tokens": 256,
-            "temperature": 0.6,
-            "typical_p": 1.0,
-            "repetition_penalty": 1.00,
-        }
-
-        ep_response = BasePublicApiInterface.general_call_post(
-            host_url=None,
-            endpoint=ep_url,
-            data=None,
-            json_data=ep_data,
-            headers=self.API_HEADER,
-            login_url=None,
-        )
-        if "response" not in ep_response:
-            return None, None, None
+        with self.__llm_router_client() as llm_router:
+            model_name = llm_router.default_model
+            ep_response = llm_router.generate_news_from_text(text=article_str)
+            if "response" not in ep_response:
+                return None, None, None
 
         article_text = ep_response["response"].get("article_text", None)
-        gen_time = ep_response.get("generation_time", None)
+        gen_time = ep_response.get("generation_time", 0)
 
         if gen_time is not None:
             gen_time = datetime.timedelta(seconds=gen_time)
@@ -965,6 +1150,9 @@ class NewsContentGrabberController:
             "Фото -",
             "Фото:",
             "Фото :",
+            "Dodaj nas do preferowanych źródeł w Google",
+            "Obserwuj nas w Google News",
+            "Przeczytaj całość artykułu!",
         ]
         par_text_lower = paragraph_text.lower()
         for p2c in phrases_to_clear:
@@ -1062,6 +1250,8 @@ class NewsContentGrabberController:
             "źr. ",
             "Źródło:",
             "Mat. oryginalny:",
+            "To jest materiałPremium",
+            "polsatnews.pl",
         ]
         for p in phrases:
             content = content.split(p)[0]

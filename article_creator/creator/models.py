@@ -87,6 +87,9 @@ class NewsSubPage(models.Model):
     page_content_html = models.TextField(null=False)
     page_content_txt = models.TextField(null=False)
 
+    # If translation is needed
+    page_content_txt_translated = models.TextField(null=True)
+
     skip_subpage = models.BooleanField(null=False, default=False)
     has_generated_news = models.BooleanField(null=False, default=False)
     is_indexed_in_sse = models.BooleanField(null=False, default=False)

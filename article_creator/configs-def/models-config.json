@@ -1,0 +1,29 @@
+{
+  "stream_news_free": {
+    "llm_router_host": "",
+    "llm_router_token": "",
+    "llm_router_model": "google/gemma-4-12b-it",
+    "llm_router_timeout": 120,
+
+    "generate_article_from_search_result": {
+      "model_name": "google/gemma-4-12b-it",
+      "model_hosts": [
+        "http://192.168.100.79:8080"
+      ],
+      "ep": {
+        "create_article_from_news_list": "api/create_full_article_from_texts"
+      }
+    }
+  },
+  "emotion_polarity": {
+    "emotion_polarity_3c": {
+      "model_name": "radlab/polarity3c-polish-roberta-large",
+      "model_hosts": [
+        "http://192.168.100.79:8900"
+      ],
+      "ep": {
+        "check_3c_polarity": "api/check_3c_polarity"
+      }
+    }
+  }
+}
