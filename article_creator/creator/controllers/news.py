@@ -16,6 +16,7 @@ from radlab_data.text.utils import TextUtils
 from radlab_data.text.processors.splitter import SentenceSplitter
 
 from llm_router_lib.client import LLMRouterClient
+from services.cross_encoder_client import CrossEncoderApiClient
 
 from creator.models import SystemUser, Clustering
 from general.api_utils import BasePublicApiInterface
@@ -43,8 +44,8 @@ from creator.serializers import (
 
 class ProperNewsParameters:
     language: str = "pl"
-    min_length: int = 125
-    min_sim_to_original: float = 0.501
+    min_length: int = 100
+    min_sim_to_original: float = 0.48
     max_num_of_generated_news: int = 4
     soft_num_of_generated_news: int = 2
 
@@ -279,18 +280,31 @@ class NewsController:
         return news_subpages
 
     @staticmethod
-    def public_subpages_without_summarization() -> QuerySet[NewsSubPage]:
+    def public_subpages_without_summarization(
+        begin_date: Optional[datetime.date] = None,
+        end_date: Optional[datetime.date] = None,
+    ) -> QuerySet[NewsSubPage]:
         """
         Returns list of subpages where:
           - main_page has prepare_news a set as True
           - subpage does not have the summary yet
         :return: List of NewsSubpage objects ordered by id
         """
-        return NewsSubPage.objects.filter(
-            main_page__prepare_news=True,
-            has_generated_news=False,
-            skip_subpage=False,
-        ).order_by("id")
+
+        filter_params: Dict[str, Any] = {
+            "main_page__prepare_news": True,
+            "has_generated_news": False,
+            "skip_subpage": False,
+        }
+
+        if begin_date:
+            filter_params["when_crawled__gte"] = begin_date
+
+        if end_date:
+            # __lt + next day ensures full calendar day of end_date is included
+            filter_params["when_crawled__lt"] = end_date + datetime.timedelta(days=1)
+
+        return NewsSubPage.objects.filter(**filter_params).order_by("id")
 
     @staticmethod
     def public_get_generated_news_for_date_range(
@@ -332,7 +346,10 @@ class NewsController:
         return j_result["response"][0]["translated"]
 
     def generate_news(
-        self, news_sub_page: NewsSubPage, cross_encoder_sim_model=None
+        self,
+        news_sub_page: NewsSubPage,
+        cross_encoder_sim_model=None,
+        ce_sim_host: Optional[str] = None,
     ) -> GeneratedNews | None:
         assert self._models_config is not None
 
@@ -350,17 +367,30 @@ class NewsController:
         orig_article_str_translated = None
 
         if news_sub_page.main_page.language != "pl":
-            orig_article_str_translated = self.__translate_to_pl(
-                text=orig_article_str
-            )
+            if news_sub_page.page_content_txt_translated is None or not len(
+                news_sub_page.page_content_txt_translated
+            ):
+                orig_article_str_translated = self.__translate_to_pl(
+                    text=orig_article_str
+                )
+            else:
+                orig_article_str_translated = (
+                    news_sub_page.page_content_txt_translated
+                )
             news_sub_page.page_content_txt_translated = orig_article_str_translated
             if self._add_to_db:
                 NewsSubPage.objects.filter(pk=news_sub_page.pk).update(
                     page_content_txt_translated=orig_article_str_translated
                 )
 
+        _orig_text = orig_article_str
+        if orig_article_str_translated is not None and len(
+            orig_article_str_translated
+        ):
+            _orig_text = orig_article_str_translated
+
         gen_article_str, gen_time, model_name = self._generate_news_from_article(
-            article_str=orig_article_str_translated or orig_article_str
+            article_str=_orig_text
         )
 
         logging.info("==" * 50)
@@ -382,7 +412,14 @@ class NewsController:
         article_language = self.__check_language(text=gen_article_str)
 
         gen_news_sim = None
-        if cross_encoder_sim_model is not None:
+        if ce_sim_host is not None:
+            ce_client = CrossEncoderApiClient(api_url=ce_sim_host)
+            gen_news_sim = ce_client.calculate_similarity(
+                gen_text=gen_article_str,
+                orig_text=orig_article_str,
+                ce_model_max_tokens=512,
+            )
+        elif cross_encoder_sim_model is not None:
             gen_news_sim = self._calculate_similarity_ce(
                 gen_article_str=gen_article_str,
                 orig_article_str=orig_article_str,
@@ -400,6 +437,7 @@ class NewsController:
                 show_news=show_news,
                 news_sub_page=news_sub_page,
                 similarity_to_original=gen_news_sim,
+                show_admin_message=False,
             )
         else:
             gen_news = GeneratedNews(
@@ -410,6 +448,7 @@ class NewsController:
                 show_news=show_news,
                 news_sub_page=news_sub_page,
                 similarity_to_original=gen_news_sim,
+                show_admin_message=False,
             )
 
         self.__validate_news_and_subpage(

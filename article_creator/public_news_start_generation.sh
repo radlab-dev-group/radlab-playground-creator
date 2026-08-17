@@ -19,5 +19,10 @@ cp "${APP_FILE_PATH_PERIODIC_APPS_DIR}" "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
 
 cd "${MAIN_PROJECT_DIR}" || return
 
-python3 "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
+python3 "${APP_FILE_PATH_MAIN_PROJECT_DIR}" \
+  --begin-date="2026-01-01" \
+  --end-date="2026-01-31" \
+  --dont-shuffle
+
+# python3 "${APP_FILE_PATH_MAIN_PROJECT_DIR}"
 rm "${APP_FILE_PATH_MAIN_PROJECT_DIR}"

@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import tempfile
@@ -13,6 +14,10 @@ def prepare_parser(desc=""):
     p = argparse.ArgumentParser(description=desc)
     p.add_argument("-c", "--json-config", dest="json_config")
     return p
+
+
+def parse_date(value: str) -> datetime.date:
+    return datetime.date.fromisoformat(value)
 
 
 def load_json_config(json_config_path: str) -> Dict:
