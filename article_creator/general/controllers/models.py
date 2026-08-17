@@ -44,9 +44,11 @@ class ModelsConfigController:
         """
         m2ep2h = {}
         for model_name, model_config in self._models_in_field.items():
+            if not isinstance(model_config, dict) or self.JSON_MODEL_TO_HOSTS not in model_config:
+                continue
             m2ep2h[model_name] = {}
             model_hosts = list(set(model_config[self.JSON_MODEL_TO_HOSTS]))
-            for ep_name, ep_url in model_config[self.JSON_MODEL_ENDPOINTS].items():
+            for ep_name, ep_url in model_config.get(self.JSON_MODEL_ENDPOINTS, {}).items():
                 m2ep2h[model_name][ep_name] = [
                     f"{h.strip('/')}/{ep_url.strip('/')}" for h in model_hosts
                 ]

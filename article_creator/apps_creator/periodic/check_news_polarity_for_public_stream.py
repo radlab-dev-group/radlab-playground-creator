@@ -26,8 +26,8 @@ def main(argv=None):
 
         news_without_polarity = polarity_controller.get_news_without_polarity_3c()
         for news in news_without_polarity:
-            res = polarity_controller.check_3c_polarity(news_list=[news])
-            polarity_str = res[0].get("label")
+            res = polarity_controller.check_polarity_3c(news_list=[news])
+            polarity_str = res[0].get("polarity", res[0].get("label")) if res else None
             logging.info(f"Checked 3c polarity for news {news.pk} => {polarity_str}")
     except Exception as e:
         logging.error(e)
