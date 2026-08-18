@@ -1,8 +1,9 @@
+import datetime
 import json
 import logging
 import queue
 import threading
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 
 from django import db
 from django.db.models import QuerySet
@@ -118,7 +119,12 @@ class PublicSSEController(ModelsConfigController):
             return None
         return response["body"]["collection_id"]
 
-    def add_and_index_news_to_sse(self, num_workers: int = 1):
+    def add_and_index_news_to_sse(
+        self,
+        num_workers: int = 1,
+        begin_date: Optional[datetime.date] = None,
+        end_date: Optional[datetime.date] = None,
+    ):
         assert self.data is not None
 
         collection_name = self.data["collection_name"]
@@ -133,7 +139,12 @@ class PublicSSEController(ModelsConfigController):
             ]
         )
 
-        gen_news_to_index_in_sse = list(self._load_news_to_index_in_sse())
+        gen_news_to_index_in_sse = list(
+            self._load_news_to_index_in_sse(
+                begin_date=begin_date,
+                end_date=end_date,
+            )
+        )
         all_news_count = len(gen_news_to_index_in_sse)
         if not gen_news_to_index_in_sse:
             return
@@ -312,8 +323,23 @@ class PublicSSEController(ModelsConfigController):
         return news_as_dict
 
     @staticmethod
-    def _load_news_to_index_in_sse() -> QuerySet[GeneratedNews]:
-        return GeneratedNews.objects.filter(
-            show_news=True,
-            news_sub_page__is_indexed_in_sse=False,
-        ).order_by("-news_sub_page__when_crawled")
+    def _load_news_to_index_in_sse(
+        begin_date: Optional[datetime.date] = None,
+        end_date: Optional[datetime.date] = None,
+    ) -> QuerySet[GeneratedNews]:
+        filter_params: Dict[str, Any] = {
+            "show_news": True,
+            "news_sub_page__is_indexed_in_sse": False,
+        }
+
+        if begin_date:
+            filter_params["news_sub_page__when_crawled__gte"] = begin_date
+
+        if end_date:
+            filter_params["news_sub_page__when_crawled__lt"] = (
+                end_date + datetime.timedelta(days=1)
+            )
+
+        return GeneratedNews.objects.filter(**filter_params).order_by(
+            "-news_sub_page__when_crawled"
+        )

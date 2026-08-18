@@ -8,7 +8,7 @@ django.setup()
 
 from system.controllers import SystemController
 from creator.controllers.sse_engine_public import PublicSSEController
-from apps_creator.periodic.src.utils import prepare_parser
+from apps_creator.periodic.src.utils import prepare_parser, parse_date
 
 
 def prepare_indexing_parser(argv=None):
@@ -19,6 +19,20 @@ def prepare_indexing_parser(argv=None):
         type=int,
         default=1,
         help="Number of workers for parallel news indexing.",
+    )
+    parser.add_argument(
+        "--begin-date",
+        dest="begin_date",
+        help="Begin date in format YYYY-MM-DD",
+        type=parse_date,
+        required=False,
+    )
+    parser.add_argument(
+        "--end-date",
+        dest="end_date",
+        help="End date in format YYYY-MM-DD",
+        type=parse_date,
+        required=False,
     )
     return parser
 
@@ -44,7 +58,11 @@ def main(argv=None):
     try:
         sse_controller = PublicSSEController(config_path=args.json_config)
         sse_controller.add_sse_collection_from_sse_public_settings(p_settings)
-        sse_controller.add_and_index_news_to_sse(num_workers=args.num_workers)
+        sse_controller.add_and_index_news_to_sse(
+            num_workers=args.num_workers,
+            begin_date=args.begin_date,
+            end_date=args.end_date,
+        )
     except Exception as e:
         logging.error(e)
 
