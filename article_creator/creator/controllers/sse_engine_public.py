@@ -163,9 +163,9 @@ class PublicSSEController(ModelsConfigController):
                     )
 
                     if response_body is not None:
-                        NewsSubPage.objects.filter(pk=gen_news.news_sub_page.pk).update(
-                            is_indexed_in_sse=True
-                        )
+                        NewsSubPage.objects.filter(
+                            pk=gen_news.news_sub_page.pk
+                        ).update(is_indexed_in_sse=True)
 
                         indexed_chunks = response_body.get("indexed_chunks", 0)
                         indexed_documents = response_body.get("indexed_documents", 0)

@@ -92,7 +92,9 @@ class PolarityController(ModelsConfigController):
                     text_3c = item.get("original", item.get("text", None))
                     assert news.generated_text == text_3c
                     label_3c = item.get("polarity", item.get("label", None))
-                    GeneratedNews.objects.filter(pk=news.pk).update(polarity_3c=label_3c)
+                    GeneratedNews.objects.filter(pk=news.pk).update(
+                        polarity_3c=label_3c
+                    )
 
         return news_polarity_response
 
@@ -102,7 +104,9 @@ class PolarityController(ModelsConfigController):
         """
         return self.check_polarity_3c(news_list=news_list)
 
-    def check_polarity_3c_local(self, news_list: List[GeneratedNews]) -> List[dict] | None:
+    def check_polarity_3c_local(
+        self, news_list: List[GeneratedNews]
+    ) -> List[dict] | None:
         """
         Check 3-class polarity using local model endpoint (previous implementation)
         :param news_list: List of GeneratedNews objects
@@ -144,7 +148,9 @@ class PolarityController(ModelsConfigController):
                     text_3c = item.get("text", item.get("original", None))
                     assert news.generated_text == text_3c
                     label_3c = item.get("label", item.get("polarity", None))
-                    GeneratedNews.objects.filter(pk=news.pk).update(polarity_3c=label_3c)
+                    GeneratedNews.objects.filter(pk=news.pk).update(
+                        polarity_3c=label_3c
+                    )
 
         return news_polarity_response
 
