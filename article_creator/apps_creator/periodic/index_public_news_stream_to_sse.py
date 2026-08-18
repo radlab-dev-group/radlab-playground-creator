@@ -11,8 +11,20 @@ from creator.controllers.sse_engine_public import PublicSSEController
 from apps_creator.periodic.src.utils import prepare_parser
 
 
+def prepare_indexing_parser(argv=None):
+    parser = prepare_parser(argv)
+    parser.add_argument(
+        "--num-workers",
+        dest="num_workers",
+        type=int,
+        default=1,
+        help="Number of workers for parallel news indexing.",
+    )
+    return parser
+
+
 def main(argv=None):
-    args = prepare_parser(argv).parse_args(argv)
+    args = prepare_indexing_parser(argv).parse_args(argv)
 
     system_settings = SystemController.get_system_settings()
     if system_settings.doing_news_semantic_indexing:
@@ -32,7 +44,7 @@ def main(argv=None):
     try:
         sse_controller = PublicSSEController(config_path=args.json_config)
         sse_controller.add_sse_collection_from_sse_public_settings(p_settings)
-        sse_controller.add_and_index_news_to_sse()
+        sse_controller.add_and_index_news_to_sse(num_workers=args.num_workers)
     except Exception as e:
         logging.error(e)
 

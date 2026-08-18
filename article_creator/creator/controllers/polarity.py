@@ -1,6 +1,9 @@
 import logging
+import queue
+import threading
 from typing import List, Dict
 
+from django import db
 from llm_router_lib.client import LLMRouterClient
 
 from creator.models import NewsSubPage, GeneratedNews
@@ -89,7 +92,9 @@ class PolarityController(ModelsConfigController):
                     text_3c = item.get("original", item.get("text", None))
                     assert news.generated_text == text_3c
                     label_3c = item.get("polarity", item.get("label", None))
-                    GeneratedNews.objects.filter(pk=news.pk).update(polarity_3c=label_3c)
+                    GeneratedNews.objects.filter(pk=news.pk).update(
+                        polarity_3c=label_3c
+                    )
 
         return news_polarity_response
 
@@ -99,7 +104,9 @@ class PolarityController(ModelsConfigController):
         """
         return self.check_polarity_3c(news_list=news_list)
 
-    def check_polarity_3c_local(self, news_list: List[GeneratedNews]) -> List[dict] | None:
+    def check_polarity_3c_local(
+        self, news_list: List[GeneratedNews]
+    ) -> List[dict] | None:
         """
         Check 3-class polarity using local model endpoint (previous implementation)
         :param news_list: List of GeneratedNews objects
@@ -141,6 +148,73 @@ class PolarityController(ModelsConfigController):
                     text_3c = item.get("text", item.get("original", None))
                     assert news.generated_text == text_3c
                     label_3c = item.get("label", item.get("polarity", None))
-                    GeneratedNews.objects.filter(pk=news.pk).update(polarity_3c=label_3c)
+                    GeneratedNews.objects.filter(pk=news.pk).update(
+                        polarity_3c=label_3c
+                    )
 
         return news_polarity_response
+
+    def check_polarity_3c_parallel(
+        self, news_list: List[GeneratedNews], num_workers: int = 1
+    ) -> List[dict]:
+        """
+        Check 3-class polarity in parallel using worker threads
+        :param news_list: List of GeneratedNews objects
+        :param num_workers: Number of parallel worker threads
+        :return: List of all checked polarity responses
+        """
+        if not news_list:
+            return []
+
+        all_news_count = len(news_list)
+        num_workers = max(1, num_workers)
+        tasks_queue: queue.Queue = queue.Queue()
+        results: List[dict] = []
+        results_lock = threading.Lock()
+
+        def worker():
+            while True:
+                item = tasks_queue.get()
+                if item is None:
+                    tasks_queue.task_done()
+                    break
+
+                news_num, news = item
+                try:
+                    logging.info(
+                        f"[*] Checking 3c polarity {news_num}/{all_news_count} news_id={news.pk}"
+                    )
+                    res = self.check_polarity_3c(news_list=[news])
+                    polarity_str = (
+                        res[0].get("polarity", res[0].get("label")) if res else None
+                    )
+                    logging.info(
+                        f"Checked 3c polarity for news {news.pk} => {polarity_str}"
+                    )
+                    if res:
+                        with results_lock:
+                            results.extend(res)
+                except Exception as e:
+                    logging.error(
+                        f"Error while checking polarity for news {news.pk}: {e}"
+                    )
+                finally:
+                    tasks_queue.task_done()
+                    db.close_old_connections()
+
+        threads = []
+        for _ in range(num_workers):
+            t = threading.Thread(target=worker)
+            t.start()
+            threads.append(t)
+
+        for news_num, news in enumerate(news_list):
+            tasks_queue.put((news_num, news))
+
+        for _ in range(num_workers):
+            tasks_queue.put(None)
+
+        for t in threads:
+            t.join()
+
+        return results
