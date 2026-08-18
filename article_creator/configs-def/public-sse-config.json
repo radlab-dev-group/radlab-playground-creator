@@ -1,0 +1,24 @@
+{
+  "news_stream_sse_collection_config": {
+    "news_collection_name": "playground_news_stream_articles",
+    "news_collection_description": "Znajdują się tutaj teksty newsów z news_stream public z Playgroundu",
+    "news_collection_display_name": "Public News Stream (playground)",
+    "news_embedder_index_type": "IVF_FLAT",
+    "news_embedder_model_name": "google/embeddinggemma-300m",
+    "news_embedder_model_size": 768,
+    "news_reranker_model_name": "sdadas/polish-reranker-roberta-v3"
+  },
+  "news_stream_sse_api_config": {
+    "sse_engine": {
+      "model_hosts": [
+        "http://192.168.100.79:8888"
+      ],
+      "ep": {
+        "login": "api/login",
+        "new_collection": "api/new_collection",
+        "add_and_index_texts": "api/add_and_index_texts",
+        "search_news": "api/search_with_options"
+      }
+    }
+  }
+}
