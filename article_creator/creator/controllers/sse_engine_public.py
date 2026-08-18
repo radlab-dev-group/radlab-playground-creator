@@ -1,7 +1,10 @@
 import json
 import logging
+import queue
+import threading
 from typing import List, Dict
 
+from django import db
 from django.db.models import QuerySet
 
 from creator.models import NewsSubPage, GeneratedNews
@@ -115,7 +118,7 @@ class PublicSSEController(ModelsConfigController):
             return None
         return response["body"]["collection_id"]
 
-    def add_and_index_news_to_sse(self):
+    def add_and_index_news_to_sse(self, num_workers: int = 1):
         assert self.data is not None
 
         collection_name = self.data["collection_name"]
@@ -130,32 +133,66 @@ class PublicSSEController(ModelsConfigController):
             ]
         )
 
-        gen_news_to_index_in_sse = self._load_news_to_index_in_sse()
+        gen_news_to_index_in_sse = list(self._load_news_to_index_in_sse())
         all_news_count = len(gen_news_to_index_in_sse)
+        if not gen_news_to_index_in_sse:
+            return
+
+        num_workers = max(1, num_workers)
+        tasks_queue: queue.Queue = queue.Queue()
+
+        def worker():
+            while True:
+                item = tasks_queue.get()
+                if item is None:
+                    tasks_queue.task_done()
+                    break
+
+                news_num, gen_news = item
+                try:
+                    logging.info(
+                        f"[*] Indexing news {news_num}/{all_news_count} news_id={gen_news.pk}"
+                    )
+
+                    news_to_index = [gen_news]
+                    response_body = self._call_sse_api_to_index_texts(
+                        collection_name=collection_name,
+                        generated_news_to_index=news_to_index,
+                        ep_url=ep_url,
+                        login_ep_url=login_ep_url,
+                    )
+
+                    if response_body is not None:
+                        NewsSubPage.objects.filter(pk=gen_news.news_sub_page.pk).update(
+                            is_indexed_in_sse=True
+                        )
+
+                        indexed_chunks = response_body.get("indexed_chunks", 0)
+                        indexed_documents = response_body.get("indexed_documents", 0)
+                        logging.info(
+                            f"    -> indexed documents={indexed_documents} "
+                            f"chunks={indexed_chunks}"
+                        )
+                except Exception as e:
+                    logging.error(f"Error while indexing news {gen_news.pk}: {e}")
+                finally:
+                    tasks_queue.task_done()
+                    db.close_old_connections()
+
+        threads = []
+        for _ in range(num_workers):
+            t = threading.Thread(target=worker)
+            t.start()
+            threads.append(t)
+
         for news_num, gen_news in enumerate(gen_news_to_index_in_sse):
-            logging.info(
-                f"[*] Indexing news {news_num}/{all_news_count} news_id={gen_news.pk}"
-            )
+            tasks_queue.put((news_num, gen_news))
 
-            news_to_index = [gen_news]
-            response_body = self._call_sse_api_to_index_texts(
-                collection_name=collection_name,
-                generated_news_to_index=news_to_index,
-                ep_url=ep_url,
-                login_ep_url=login_ep_url,
-            )
+        for _ in range(num_workers):
+            tasks_queue.put(None)
 
-            if response_body is not None:
-                NewsSubPage.objects.filter(pk=gen_news.news_sub_page.pk).update(
-                    is_indexed_in_sse=True
-                )
-
-                indexed_chunks = response_body.get("indexed_chunks", 0)
-                indexed_documents = response_body.get("indexed_documents", 0)
-                logging.info(
-                    f"    -> indexed documents={indexed_documents} "
-                    f"chunks={indexed_chunks}"
-                )
+        for t in threads:
+            t.join()
 
     def search_news(
         self, text_to_search: str, num_of_results: int, relative_paths: list
