@@ -1,0 +1,87 @@
+{
+  "clusterer": {
+    "device": "cuda",
+    "embedder_path": "google/embeddinggemma-300m",
+    "embedder_input_size": 8000,
+    "method": "hdbscan",
+    "reduction": "tsne",
+    "reducer_optim": "barnes_hut",
+    "reducer_sim_metric": "cosine",
+    "reducer_sim_metric_2": "euclidean",
+    "use_reduced_dataset": true,
+    "clustering_params": [
+      {
+        "min_samples": 1,
+        "min_cluster_size": 30,
+        "metric": "euclidean"
+      },
+      {
+        "min_samples": 1,
+        "min_cluster_size": 32,
+        "metric": "euclidean"
+      },
+      {
+        "min_samples": 1,
+        "min_cluster_size": 34,
+        "metric": "euclidean"
+      },
+      {
+        "min_samples": 1,
+        "min_cluster_size": 36,
+        "metric": "euclidean"
+      },
+      {
+        "min_samples": 1,
+        "min_cluster_size": 38,
+        "metric": "euclidean"
+      },
+      {
+        "min_samples": 1,
+        "min_cluster_size": 40,
+        "metric": "euclidean"
+      },
+      {
+        "min_samples": 1,
+        "min_cluster_size": 60,
+        "metric": "euclidean"
+      }
+    ]
+  },
+  "labeller": {
+    "llama_service_host": "http://192.168.100.79:8000",
+    "prepare_labels": {
+      "config": {
+        "system_prompt": "",
+        "user_last_statement": "",
+        "historical_messages": [],
+        "model_name": "google/gemma-4-12b-it",
+        "proper_input": true,
+        "post_proc_llama_output": true,
+        "top_k": 50,
+        "top_p": 0.99,
+        "max_new_tokens": 256,
+        "temperature": 0.6,
+        "typical_p": 1,
+        "repetition_penalty": 1.05
+      },
+      "ep": "api/extended_conversation_with_model"
+    },
+    "prepare_article": {
+      "config": {
+        "system_prompt": "",
+        "user_last_statement": "",
+        "historical_messages": [],
+        "model_name": "google/gemma-4-12b-it",
+        "proper_input": true,
+        "post_proc_llama_output": true,
+        "top_k": 50,
+        "top_p": 0.99,
+        "max_new_tokens": 256,
+        "temperature": 0.6,
+        "typical_p": 1,
+        "repetition_penalty": 1.05
+      },
+      "ep": "api/extended_conversation_with_model"
+    }
+  }
+}
