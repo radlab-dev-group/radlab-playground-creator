@@ -209,7 +209,7 @@ class PublicArticleCreatorFromSearchResult(APIView):
             news_list=news_for_article,
             new_article_type=new_article_type,
             query_response_id=query_response_id,
-            model_name="google/gemma-3-12b-it",
+            model_name="google/gemma-4-12b-it",
         )
 
         return response_with_status(
