@@ -270,7 +270,7 @@ class Cluster:
         clr_phrases = [
             ["Dziśnie", "Dzisie"],
             ["## ", self.TITLE_SIZE_MD],
-            [" $", " \$"],
+            [" $", " \\$"],
         ]
         for ch_from, ch_to in clr_phrases:
             article_text = article_text.replace(ch_from, ch_to)
