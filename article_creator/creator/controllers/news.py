@@ -312,8 +312,8 @@ class NewsController:
     ) -> QuerySet[GeneratedNews]:
         return GeneratedNews.objects.filter(
             show_news=True,
-            news_sub_page__when_generated__lte=end_date,
-            news_sub_page__when_generated__gte=begin_date,
+            news_sub_page__when_crawled__lte=end_date,
+            news_sub_page__when_crawled__gte=begin_date,
         )
 
     def __llm_router_client(self) -> LLMRouterClient:
