@@ -109,7 +109,7 @@ class Cluster:
         self.__prepare_rand_texts()
 
     def prepare_stats(self):
-        avg_md = ["pli_value"]
+        avg_md = []
         enum_md = ["language", "polarity_3c", "source"]
 
         stats = {}
@@ -499,7 +499,6 @@ class ClusteringHandler:
         for cluster in self.clusters_objects.values():
             stats = cluster.prepare_stats()
             import json
-
             print(json.dumps(stats, indent=2, ensure_ascii=False))
 
     def __prepare_labeller_config(self):
