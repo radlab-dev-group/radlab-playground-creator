@@ -1,3 +1,4 @@
+import json
 import torch
 import numpy
 import random
@@ -498,7 +499,6 @@ class ClusteringHandler:
     def __prepare_clusters_stats(self):
         for cluster in self.clusters_objects.values():
             stats = cluster.prepare_stats()
-            import json
             print(json.dumps(stats, indent=2, ensure_ascii=False))
 
     def __prepare_labeller_config(self):
