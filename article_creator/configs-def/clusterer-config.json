@@ -201,7 +201,7 @@
         "post_proc_llama_output": true,
         "top_k": 50,
         "top_p": 0.99,
-        "max_new_tokens": 256,
+        "max_new_tokens": 2048,
         "temperature": 0.6,
         "typical_p": 1,
         "repetition_penalty": 1.05
