@@ -305,7 +305,7 @@ class Cluster:
 
 
 class ClusteringHandler:
-    MAX_TEXTS_TO_API = 15
+    MAX_TEXTS_TO_API = 55
     MAX_TEXT_CHARS_LENGTH = 700
 
     def __init__(
