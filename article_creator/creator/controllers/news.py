@@ -159,7 +159,6 @@ class NewsController:
     MAIN_NEWS_STREAM_LLM_ROUTER_TIMEOUT = "llm_router_timeout"
 
     ####
-    MAIN_NEWS_CREATOR_GENERATE_ARTICLE = "generate_article_from_search_result"
     API_HEADER = {"Content-Type": "application/json; charset=utf-8"}
 
     def __init__(
