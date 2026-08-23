@@ -477,7 +477,7 @@ class NewsController:
                 user_query=user_query,
                 texts=news_texts,
                 article_type=new_article_type,
-                max_new_tokens=4096,
+                max_new_tokens=6000,
             )
 
         if "response" not in ep_response:
