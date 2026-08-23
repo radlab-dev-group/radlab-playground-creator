@@ -470,41 +470,21 @@ class NewsController:
         model_name: str,
     ) -> FullGeneratedArticles | None:
         news_texts = [n.generated_text for n in news_list]
-        ep_data = {
-            "user_query": user_query,
-            "texts": news_texts,
-            "article_type": new_article_type,
-            "model_name": model_name,
-            "top_k": 50,
-            "top_p": 0.99,
-            "temperature": 0.65,
-            "typical_p": 1.0,
-            "repetition_penalty": 1.07,
-            "max_new_tokens": 3560,
-        }
 
-        model_host = self._models_config[self.MAIN_NEWS_CREATOR_GENERATE_ARTICLE][
-            "model_hosts"
-        ][0]
-        prepare_article_ep = self._models_config[
-            self.MAIN_NEWS_CREATOR_GENERATE_ARTICLE
-        ]["ep"]["create_article_from_news_list"]
-        ep_url = f"{model_host.strip('/')}/{prepare_article_ep.strip('/')}"
-        ep_response = BasePublicApiInterface.general_call_post(
-            host_url=None,
-            endpoint=ep_url,
-            data=None,
-            json_data=ep_data,
-            headers=self.API_HEADER,
-            login_url=None,
-        )
+        with self.__llm_router_client() as llm_router:
+            model_name = llm_router.default_model
+            ep_response = llm_router.create_full_article_from_texts(
+                user_query=user_query,
+                texts=news_texts,
+                article_type=new_article_type,
+                max_new_tokens=4096,
+            )
 
         if "response" not in ep_response:
             return None
 
         ep_gen_time = datetime.timedelta(seconds=ep_response["generation_time"])
 
-        article_str = ""
         if type(ep_response["response"]) == dict:
             article_str = ep_response["response"]["article_text"]
         elif type(ep_response["response"]) == str:
