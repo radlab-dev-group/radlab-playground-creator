@@ -10,5 +10,11 @@
     "llm_router_token": "",
     "llm_router_model": "google/gemma-4-12b-it",
     "llm_router_timeout": 120
+  },
+  "clustering": {
+    "llm_router_host": "",
+    "llm_router_token": "",
+    "llm_router_model": "google/gemma-4-12b-it",
+    "llm_router_timeout": 120
   }
 }
