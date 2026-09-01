@@ -336,13 +336,18 @@ class NewsController:
 
     def __translate_to_pl(self, text: str) -> str:
         with self.__llm_router_client() as llm_router:
-            j_result = llm_router.translate(
+            ep_response = llm_router.translate(
                 temperature=0.5, max_new_tokens=len(text), texts=[text]
             )
 
-        if not j_result or not "response" in j_result:
+        if (
+            ep_response is None
+            or ep_response.response is None
+            or len(ep_response.response) == 0
+            or ep_response.response[0].translated is None
+        ):
             return text
-        return j_result["response"][0]["translated"]
+        return ep_response.response[0].translated
 
     def generate_news(
         self,
@@ -479,17 +484,15 @@ class NewsController:
                 max_new_tokens=6000,
             )
 
-        if "response" not in ep_response:
+        if (
+            ep_response is None
+            or ep_response.response is None
+            or ep_response.response.article_text is None
+        ):
             return None
 
-        ep_gen_time = datetime.timedelta(seconds=ep_response["generation_time"])
-
-        if type(ep_response["response"]) == dict:
-            article_str = ep_response["response"]["article_text"]
-        elif type(ep_response["response"]) == str:
-            article_str = ep_response["response"]
-        else:
-            raise Exception("Unknown response type!")
+        article_str = ep_response.response.article_text
+        ep_gen_time = datetime.timedelta(seconds=ep_response.generation_time or 0)
 
         news_list_ids = [n.pk for n in news_list]
         full_g_art = FullGeneratedArticles.objects.create(
@@ -770,22 +773,24 @@ class NewsController:
 
     def _generate_news_from_article(
         self, article_str: str
-    ) -> (str | None, float | None, str | None):
+    ) -> (str | None, datetime.timedelta | None, str | None):
 
         if len(article_str) > self.MAX_PUBLIC_NEWS_CHAR_LENGTH:
             article_str = article_str[: self.MAX_PUBLIC_NEWS_CHAR_LENGTH]
 
         with self.__llm_router_client() as llm_router:
             model_name = llm_router.default_model
-            ep_response = llm_router.generate_news_from_text(text=article_str)
-            if "response" not in ep_response:
-                return None, None, None
+            ep_response = llm_router.generate_article_from_text(text=article_str)
 
-        article_text = ep_response["response"].get("article_text", None)
-        gen_time = ep_response.get("generation_time", 0)
+        if (
+            ep_response is None
+            or ep_response.response is None
+            or ep_response.response.article_text is None
+        ):
+            return None, None, None
 
-        if gen_time is not None:
-            gen_time = datetime.timedelta(seconds=gen_time)
+        article_text = ep_response.response.article_text
+        gen_time = datetime.timedelta(seconds=ep_response.generation_time or 0)
 
         return article_text, gen_time, model_name
 
