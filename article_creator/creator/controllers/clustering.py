@@ -127,7 +127,8 @@ class Cluster:
 
         try:
             ep_response = llm_router.generate_article_from_texts(
-                texts=self.random_proper_texts
+                texts=self.random_proper_texts,
+                max_new_tokens=4096
             )
         except Exception as e:
             get_logger().error(
