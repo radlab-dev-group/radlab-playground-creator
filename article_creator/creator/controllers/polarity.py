@@ -5,6 +5,7 @@ from typing import List, Dict
 
 from django import db
 from llm_router_lib.client import LLMRouterClient
+from llm_router_lib.data_models import Polarity3cItem
 
 from creator.models import NewsSubPage, GeneratedNews
 from system.models import PublicSSESettings
@@ -63,11 +64,13 @@ class PolarityController(ModelsConfigController):
     def get_all_news():
         return list(GeneratedNews.objects.all().order_by("-when_generated"))
 
-    def check_polarity_3c(self, news_list: List[GeneratedNews]) -> List[dict] | None:
+    def check_polarity_3c(
+        self, news_list: List[GeneratedNews]
+    ) -> List[Polarity3cItem] | None:
         """
         Check 3-class polarity using LLM Router client
         :param news_list: List of GeneratedNews objects
-        :return: List of dicts with polarity results or None on error
+        :return: List of Polarity3cItem models or None on error
         """
         logging.info("Checking 3c polarity")
         if not news_list:
@@ -76,29 +79,29 @@ class PolarityController(ModelsConfigController):
         texts_to_check = [n.generated_text for n in news_list]
 
         with self.__llm_router_client() as llm_router:
-            response = llm_router.polarity_3c(texts=texts_to_check)
+            ep_response = llm_router.polarity_3c(texts=texts_to_check)
 
-        if not response or "response" not in response:
-            self._last_response = response
+        if ep_response is None or ep_response.response is None:
+            self._last_response = ep_response
             return None
 
-        news_polarity_response = response["response"]
-        self._last_response = response
+        news_polarity_response = ep_response.response
+        self._last_response = ep_response
 
         if self.add_to_db:
             for idx, news in enumerate(news_list):
                 if idx < len(news_polarity_response):
                     item = news_polarity_response[idx]
-                    text_3c = item.get("original", item.get("text", None))
-                    assert news.generated_text == text_3c
-                    label_3c = item.get("polarity", item.get("label", None))
+                    assert news.generated_text == item.original
                     GeneratedNews.objects.filter(pk=news.pk).update(
-                        polarity_3c=label_3c
+                        polarity_3c=item.polarity
                     )
 
         return news_polarity_response
 
-    def check_3c_polarity(self, news_list: List[GeneratedNews]) -> List[dict] | None:
+    def check_3c_polarity(
+        self, news_list: List[GeneratedNews]
+    ) -> List[Polarity3cItem] | None:
         """
         Backwards-compatible wrapper for check_polarity_3c
         """
@@ -156,7 +159,7 @@ class PolarityController(ModelsConfigController):
 
     def check_polarity_3c_parallel(
         self, news_list: List[GeneratedNews], num_workers: int = 1
-    ) -> List[dict]:
+    ) -> List[Polarity3cItem]:
         """
         Check 3-class polarity in parallel using worker threads
         :param news_list: List of GeneratedNews objects
@@ -169,7 +172,7 @@ class PolarityController(ModelsConfigController):
         all_news_count = len(news_list)
         num_workers = max(1, num_workers)
         tasks_queue: queue.Queue = queue.Queue()
-        results: List[dict] = []
+        results: List[Polarity3cItem] = []
         results_lock = threading.Lock()
 
         def worker():
@@ -185,9 +188,7 @@ class PolarityController(ModelsConfigController):
                         f"[*] Checking 3c polarity {news_num}/{all_news_count} news_id={news.pk}"
                     )
                     res = self.check_polarity_3c(news_list=[news])
-                    polarity_str = (
-                        res[0].get("polarity", res[0].get("label")) if res else None
-                    )
+                    polarity_str = getattr(res[0], "polarity", None) if res else None
                     logging.info(
                         f"Checked 3c polarity for news {news.pk} => {polarity_str}"
                     )
