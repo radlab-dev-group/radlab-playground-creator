@@ -1,14 +1,18 @@
+import json
 import torch
 import numpy
 import random
 import datetime
-import requests
+from typing import Optional
 
 from tqdm import tqdm
 from django.db.models import Q
 from django.utils import timezone
 
+from llm_router_lib.client import LLMRouterClient
+
 from main.src.constants import get_logger
+from general.constants import DEFAULT_MODELS_CONFIG
 
 from clusterer.clustering.config import ClustererConfig
 from clusterer.clustering.clusterer import RdlClusterer
@@ -21,46 +25,6 @@ from creator.models import (
     SimilarClusters,
     SingleDaySummary,
 )
-
-
-class ClusteringPrompts:
-    GENERATE_LABEL = """
-You are an agent who helps to come up with a category name (in Polish) from the submitted texts.
-The category name should capture the essence of the submitted texts as best as possible. 
-The name can be a short sentence. Apart from the category name, do not write anything.
-Do not add anything from yourself. Be creative when coming up with a name.
-"""
-
-    GENERATE_LABEL_PL = """
-Jesteś agentem, który pomaga w wymysleniu nazwy kategorii z przesłanych tekstów.
-Nazwa kategorii powinna jak najlepiej oddawać istotę przesłanych tekstów. 
-Nazwa może być krótkim zdaniem. Oprócz nazwy kategorii nie pisz nic.
-Nic od siebie nie dodawaj. Bądź kreatywny przy wymyślaniu nazwy. 
-"""
-
-    PREPARE_ARTICLE = """
-You are an agent whose job is to write short (about an A4 page)
-articles, summarizing texts/news sent to you by a user.
-The news that the user sends you is from one day. You write an overview of
-articles that came out today. Do not write what day it is.
-Also, don't state that the article is written based on the 
-based on the content provided. Write the article in Polish.
-"""
-
-    PREPARE_ARTICLE_PL = """
-Jesteś agentem, którego zadaniem jest pisanie krótkich (około strony A4)
-artykułów, podsumowujących teksty/newsy przesłane przez użytkownika.
-Newsy, które przesyła Ci użytkownik są z jednego dnia. Piszesz przegląd
-artykułów, które ukazały się dziś. Nie pisz jakiego to dnia.
-Nie podawaj również informacji, że artykuł pisany jest na 
-podstawie dostarczonych treści. Artykuł napisz po polsku.
-"""
-
-    CHECK_SPELLING = """
-Popraw literówki w przesłanym przez użytkownika tekście.
-W odpowiedzi podaj tylko artykuł z poprawionymi błędami językowymi.
-Nie dodawaj nic od siebie, nie zmieniaj sensu przesłanego tekstu.
-"""
 
 
 class Cluster:
@@ -109,7 +73,7 @@ class Cluster:
         self.__prepare_rand_texts()
 
     def prepare_stats(self):
-        avg_md = ["pli_value"]
+        avg_md = []
         enum_md = ["language", "polarity_3c", "source"]
 
         stats = {}
@@ -137,49 +101,51 @@ class Cluster:
         self.stats = stats
         return self.stats
 
-    def generate_label_with_genai(self, host: str, ep: str, payload: dict):
+    def generate_label_with_genai(self, llm_router: LLMRouterClient):
         self.generated_label = ""
 
-        response = self.__request_post_extended_conversation_with_data(
-            host=host,
-            ep=ep,
-            payload=payload,
-            data=self.random_proper_texts,
-            prompt=ClusteringPrompts.GENERATE_LABEL,
-        )
-
-        if not response.ok:
+        try:
+            ep_response = llm_router.generate_label(
+                texts=self.random_proper_texts
+            )
+        except Exception as e:
+            get_logger().error(
+                f"generate_label failed for cluster {self.label}: {e}"
+            )
             return
 
-        information_name = response.json()["response"]
+        if ep_response is None or ep_response.response is None:
+            return
+
         generated_label = self.__clear_generated_information_label(
-            label=information_name
+            label=ep_response.response
         )
         self.generated_label = generated_label.strip()
 
-    def generate_article(
-        self, host: str, ep: str, payload: dict, check_spelling: bool = True
-    ):
+    def generate_article(self, llm_router: LLMRouterClient):
         self.generated_article = None
 
-        response = self.__request_post_extended_conversation_with_data(
-            host=host,
-            ep=ep,
-            payload=payload,
-            data=self.random_proper_texts,
-            prompt=ClusteringPrompts.PREPARE_ARTICLE,
-        )
-
-        if not response.ok:
+        try:
+            ep_response = llm_router.generate_article_from_texts(
+                texts=self.random_proper_texts,
+                max_new_tokens=4096
+            )
+        except Exception as e:
+            get_logger().error(
+                f"generate_article_from_texts failed for cluster {self.label}: {e}"
+            )
             return
 
-        article_text = response.json()["response"]
-        if check_spelling:
-            article_text = self.__check_and_repair_spelling(
-                text=article_text, host=host, ep=ep, payload=payload
-            )
+        if (
+            ep_response is None
+            or ep_response.response is None
+            or ep_response.response.article_text is None
+        ):
+            return
 
-        article_text = self.__clear_generated_article(article_text=article_text)
+        article_text = self.__clear_generated_article(
+            article_text=ep_response.response.article_text
+        )
         self.generated_article = article_text.strip()
 
     def to_cluster_db(self, to_db: bool, clustering: Clustering) -> ClusterDB:
@@ -220,42 +186,6 @@ class Cluster:
             self.random_news_pk.append(self.news_pk[i])
             self.random_news_urls.append(self.news_urls[i])
 
-    def __check_and_repair_spelling(
-        self, text: str, host: str, ep: str, payload: dict
-    ) -> str:
-
-        response = self.__request_post_extended_conversation_with_data(
-            host=host,
-            ep=ep,
-            payload=payload,
-            data=[text],
-            prompt=ClusteringPrompts.CHECK_SPELLING,
-        )
-
-        if not response.ok:
-            return text
-
-        repaired_text = response.json()["response"]
-        return repaired_text.strip()
-
-    @staticmethod
-    def __request_post_extended_conversation_with_data(
-        host: str, ep: str, payload: dict, data: list[str], prompt: str
-    ):
-        ep = ep.strip("/").strip()
-        host = host.strip("/").strip()
-
-        ep_body = payload.copy()
-        ep_body["system_prompt"] = prompt.strip()
-        ep_body["user_last_statement"] = "\n".join(data).strip()
-
-        ep_url = f"{host}/{ep}"
-        response = requests.post(
-            ep_url, json=ep_body, headers={"Content-Type": "application/json"}
-        )
-
-        return response
-
     def __clear_generated_article(self, article_text: str) -> str:
         article_text = self.__replace_predefined_phrases(article_text=article_text)
         article_text = self.__reconstruct_title(article_text=article_text)
@@ -270,7 +200,7 @@ class Cluster:
         clr_phrases = [
             ["Dziśnie", "Dzisie"],
             ["## ", self.TITLE_SIZE_MD],
-            [" $", " \$"],
+            [" $", " \\$"],
         ]
         for ch_from, ch_to in clr_phrases:
             article_text = article_text.replace(ch_from, ch_to)
@@ -305,8 +235,17 @@ class Cluster:
 
 
 class ClusteringHandler:
-    MAX_TEXTS_TO_API = 15
+    MAX_TEXTS_TO_API = 55
     MAX_TEXT_CHARS_LENGTH = 700
+
+    CLUSTERING_LLM_ROUTER_SECTION = "clustering"
+    LLM_ROUTER_HOST = "llm_router_host"
+    LLM_ROUTER_TOKEN = "llm_router_token"
+    LLM_ROUTER_MODEL = "llm_router_model"
+    LLM_ROUTER_TIMEOUT = "llm_router_timeout"
+
+    GENAI_LABEL_ENDPOINT = "api/generate_label"
+    GENAI_ARTICLE_ENDPOINT = "api/generate_article_from_texts"
 
     def __init__(
         self,
@@ -314,6 +253,7 @@ class ClusteringHandler:
         min_cluster_count: int,
         opt_cluster_count: int,
         max_cluster_count: int,
+        models_config_path: Optional[str] = DEFAULT_MODELS_CONFIG,
     ):
         self.prepared_clusters = False
 
@@ -336,12 +276,12 @@ class ClusteringHandler:
 
         self.clusters_objects = {}
 
-        # LLMS service config
-        self.llms_service_host = ""
-        self.prepare_labels_ep = ""
-        self.prepare_labels_payload = {}
-        self.prepare_article_ep = ""
-        self.prepare_article_payload = {}
+        # LLM router (models) config
+        self._models_config = None
+        self._models_config_path = models_config_path
+
+        if models_config_path is not None and len(models_config_path.strip()):
+            self._load_models_config(models_config_path)
 
     def clear(self):
         self.clusters_objects.clear()
@@ -351,7 +291,6 @@ class ClusteringHandler:
         self,
         generate_labels: bool,
         generate_articles: bool,
-        check_spelling: bool = True,
     ):
         assert self.clusterer is not None
         self.prepared_clusters = self.clusterer.run()
@@ -366,7 +305,7 @@ class ClusteringHandler:
             self.generate_labels()
 
         if generate_articles:
-            self.generate_articles(check_spelling=check_spelling)
+            self.generate_articles()
 
     def to_db_objects(
         self, day_to_summary: datetime.date, store_to_db: bool = False
@@ -386,21 +325,14 @@ class ClusteringHandler:
         return sds, all_db_clusters
 
     def __clustering_to_db_object(self, store_to_db: bool):
+        model_name = (self._models_config or {}).get(self.LLM_ROUTER_MODEL) or (
+            "- not given -"
+        )
         clustering = Clustering(
-            genai_labels_model=self.config.labeller_config_dict.get(
-                "prepare_labels", {}
-            )
-            .get("config", {})
-            .get("model_name")
-            or "- not given -",
-            genai_labels_prompt=ClusteringPrompts.GENERATE_LABEL.strip(),
-            genai_article_model=self.config.labeller_config_dict.get(
-                "prepare_article", {}
-            )
-            .get("config", {})
-            .get("model_name")
-            or "- not given -",
-            genai_article_prompt=ClusteringPrompts.PREPARE_ARTICLE.strip(),
+            genai_labels_model=model_name,
+            genai_labels_prompt=self.GENAI_LABEL_ENDPOINT,
+            genai_article_model=model_name,
+            genai_article_prompt=self.GENAI_ARTICLE_ENDPOINT,
             clustering_options=self.clusterer.clusterer.params,
             clustering_method=self.clusterer.method,
             reducer_method=self.clusterer.reduction,
@@ -436,40 +368,53 @@ class ClusteringHandler:
 
         return summary
 
+    def __llm_router_client(self) -> LLMRouterClient:
+        """
+        Create an LLMRouterClient configured for the clustering (labeller)
+        service from the loaded models config.
+        """
+        return LLMRouterClient(
+            api=self._models_config[self.LLM_ROUTER_HOST],
+            token=self._models_config[self.LLM_ROUTER_TOKEN],
+            default_model=self._models_config[self.LLM_ROUTER_MODEL],
+            timeout=self._models_config[self.LLM_ROUTER_TIMEOUT],
+        )
+
+    def _load_models_config(self, models_config_path):
+        self._models_config = json.load(open(models_config_path, "rt")).get(
+            self.CLUSTERING_LLM_ROUTER_SECTION
+        )
+        assert (
+            self._models_config is not None
+        ), f"Cannot find {self.CLUSTERING_LLM_ROUTER_SECTION} in config!"
+
     def generate_labels(self):
         if not self.prepared_clusters or not len(self.clusters_objects):
             return
 
-        self.__prepare_labeller_config()
+        assert self._models_config is not None, "LLM router models config is not loaded"
 
-        with tqdm(
-            total=len(self.clusters_objects), desc="Labels generation"
-        ) as pbar:
-            for cluster in self.clusters_objects.values():
-                cluster.generate_label_with_genai(
-                    host=self.llms_service_host,
-                    ep=self.prepare_labels_ep,
-                    payload=self.prepare_labels_payload,
-                )
-                pbar.update(1)
+        with self.__llm_router_client() as llm_router:
+            with tqdm(
+                total=len(self.clusters_objects), desc="Labels generation"
+            ) as pbar:
+                for cluster in self.clusters_objects.values():
+                    cluster.generate_label_with_genai(llm_router=llm_router)
+                    pbar.update(1)
 
-    def generate_articles(self, check_spelling: bool = True):
+    def generate_articles(self):
         if not self.prepared_clusters or not len(self.clusters_objects):
             return
 
-        self.__prepare_labeller_config()
+        assert self._models_config is not None, "LLM router models config is not loaded"
 
-        with tqdm(
-            total=len(self.clusters_objects), desc="Creating summary of articles"
-        ) as pbar:
-            for cluster in self.clusters_objects.values():
-                cluster.generate_article(
-                    host=self.llms_service_host,
-                    ep=self.prepare_article_ep,
-                    payload=self.prepare_article_payload,
-                    check_spelling=check_spelling,
-                )
-                pbar.update(1)
+        with self.__llm_router_client() as llm_router:
+            with tqdm(
+                total=len(self.clusters_objects), desc="Creating summary of articles"
+            ) as pbar:
+                for cluster in self.clusters_objects.values():
+                    cluster.generate_article(llm_router=llm_router)
+                    pbar.update(1)
 
     def __prepare_clusters(self):
         assert len(self.clusterer.dataset.dataset) == len(
@@ -498,30 +443,7 @@ class ClusteringHandler:
     def __prepare_clusters_stats(self):
         for cluster in self.clusters_objects.values():
             stats = cluster.prepare_stats()
-            import json
-
             print(json.dumps(stats, indent=2, ensure_ascii=False))
-
-    def __prepare_labeller_config(self):
-        assert self.config.labeller_config_dict is not None
-        assert len(self.config.labeller_config_dict)
-
-        self.llms_service_host = self.config.labeller_config_dict[
-            "llama_service_host"
-        ]
-        self.prepare_labels_ep = self.config.labeller_config_dict["prepare_labels"][
-            "ep"
-        ]
-        self.prepare_labels_payload = self.config.labeller_config_dict[
-            "prepare_labels"
-        ]["config"]
-        self.prepare_article_ep = self.config.labeller_config_dict[
-            "prepare_article"
-        ]["ep"]
-        self.prepare_article_payload = self.config.labeller_config_dict[
-            "prepare_article"
-        ]["config"]
-
 
 class ClusteringSimilarityController:
     MIN_MOST_SIM_CLUSTERS_COUNT = 4

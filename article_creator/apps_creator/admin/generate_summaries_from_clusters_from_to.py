@@ -104,7 +104,7 @@ def main(argv=None):
 
         # Run clustering, prepare labels, and articles
         cl_handler.run(
-            generate_labels=True, generate_articles=True, check_spelling=False
+            generate_labels=True, generate_articles=True
         )
 
         sds, clusters = cl_handler.to_db_objects(
